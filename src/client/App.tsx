@@ -10,6 +10,7 @@ import { QuickShareModal } from "./components/QuickShareModal.js";
 import { Dashboard } from "./components/Dashboard.js";
 import { UserProfile } from "./components/UserProfile.js";
 import { AuthModal } from "./components/AuthModal.js";
+import { AboutModal, TermsModal } from "./components/LegalModals.js";
 import { getAuthToken, removeAuthToken, saveEditToken } from "./utils/storage.js";
 
 type RouteView = "editor" | "paste" | "dashboard" | "profile";
@@ -38,6 +39,8 @@ export const App: React.FC = () => {
   const [isQuickShareOpen, setIsQuickShareOpen] = useState(false);
 
   const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [isAboutOpen, setIsAboutOpen] = useState(false);
+  const [isTermsOpen, setIsTermsOpen] = useState(false);
 
   // Sync theme
   useEffect(() => {
@@ -247,15 +250,24 @@ export const App: React.FC = () => {
       </main>
 
       {/* Footer */}
-      <footer className="no-print border-t border-gray-200 dark:border-slate-800/80 bg-white dark:bg-slate-900 py-6 text-center text-xs text-gray-500 dark:text-gray-400 transition-colors">
-        <div className="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <p className="font-semibold text-gray-700 dark:text-gray-300">
-            Quick<span className="text-blue-600">Tfer</span> — Fast Transfer & Paste Sharing with 60-Minute Quick Code
-          </p>
-          <div className="flex items-center gap-4">
-            <button onClick={() => navigateTo("editor", "/")} className="hover:text-blue-600">New Paste</button>
-            <button onClick={() => setIsQuickCodeInputOpen(true)} className="hover:text-blue-600">Enter Quick Code</button>
-            <a href="/api/health" target="_blank" className="hover:text-blue-600">API Health</a>
+      <footer className="no-print border-t border-gray-200 dark:border-slate-800/80 bg-white dark:bg-slate-900 py-6 text-xs text-gray-500 dark:text-gray-400 transition-colors">
+        <div className="max-w-6xl mx-auto px-4 flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex flex-col items-center md:items-start gap-1">
+            <div className="flex items-center gap-1.5 font-bold text-gray-800 dark:text-gray-200">
+              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+              <span>Quick<span className="text-blue-600">Trfr</span></span>
+              <span className="font-normal text-gray-400">· Independent Text Publishing & Fast Transfer</span>
+            </div>
+            <p className="text-[11px] text-gray-400 dark:text-gray-500">
+              © {new Date().getFullYear()} QuickTrfr. All rights reserved. Zero-logging temporary sharing & AES-256-GCM encryption.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-5 font-medium">
+            <button onClick={() => navigateTo("editor", "/")} className="hover:text-blue-600 transition">Create Note</button>
+            <button onClick={() => setIsQuickCodeInputOpen(true)} className="hover:text-blue-600 transition">Quick Code</button>
+            <button onClick={() => setIsAboutOpen(true)} className="hover:text-blue-600 transition">About</button>
+            <button onClick={() => setIsTermsOpen(true)} className="hover:text-blue-600 transition">Terms & Privacy</button>
+            <a href="/api/health" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 transition">Status</a>
           </div>
         </div>
       </footer>
@@ -306,6 +318,16 @@ export const App: React.FC = () => {
         isOpen={isAuthOpen}
         onClose={() => setIsAuthOpen(false)}
         onAuthSuccess={(u) => setUser(u)}
+      />
+
+      <AboutModal
+        isOpen={isAboutOpen}
+        onClose={() => setIsAboutOpen(false)}
+      />
+
+      <TermsModal
+        isOpen={isTermsOpen}
+        onClose={() => setIsTermsOpen(false)}
       />
     </div>
   );
