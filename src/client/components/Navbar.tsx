@@ -42,8 +42,13 @@ export const Navbar: React.FC<NavbarProps> = ({
     <header className="sticky top-0 z-40 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 shadow-sm transition-colors">
       <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
         {/* Brand Logo */}
-        <div
-          onClick={onNavigateHome}
+        <a
+          href="/"
+          onClick={(e) => {
+            e.preventDefault();
+            onNavigateHome();
+          }}
+          aria-label="QuickTrfr Home - Fast Paste and Transfer Anywhere"
           className="flex items-center gap-2 cursor-pointer group"
         >
           <div className="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center text-white shadow-sm group-hover:bg-blue-700 transition">
@@ -59,13 +64,15 @@ export const Navbar: React.FC<NavbarProps> = ({
               fast paste & transfer anywhere
             </span>
           </div>
-        </div>
+        </a>
 
         {/* Action Controls */}
         <div className="flex items-center gap-2 sm:gap-3">
           {/* New Paste CTA */}
           <button
+            type="button"
             onClick={onNavigateHome}
+            aria-label="Create new paste note"
             className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold rounded-lg bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900 transition"
           >
             <PlusCircle className="w-4 h-4" />
@@ -74,7 +81,9 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* 60-Minute Quick Code Access Button */}
           <button
+            type="button"
             onClick={onOpenQuickCode}
+            aria-label="Open paste with 6-digit quick code"
             className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold rounded-lg bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800/80 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/60 transition shadow-xs"
             title="Open a paste anywhere with a 6-digit code"
           >
@@ -84,7 +93,9 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* Dark Mode Toggle */}
           <button
+            type="button"
             onClick={onToggleDarkMode}
+            aria-label={darkMode ? "Switch to light mode" : "Switch to dark mode"}
             className="p-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition"
             title="Toggle theme"
           >
@@ -95,7 +106,10 @@ export const Navbar: React.FC<NavbarProps> = ({
           {user ? (
             <div className="relative">
               <button
+                type="button"
                 onClick={() => setMenuOpen(!menuOpen)}
+                aria-label="User account menu"
+                aria-expanded={menuOpen}
                 className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 hover:bg-gray-100 dark:hover:bg-slate-700 text-sm font-medium text-gray-800 dark:text-gray-200 transition"
               >
                 <div className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold uppercase">
@@ -146,7 +160,9 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
           ) : (
             <button
+              type="button"
               onClick={onOpenAuth}
+              aria-label="Sign in to QuickTrfr account"
               className="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm shadow-xs transition"
             >
               Sign In

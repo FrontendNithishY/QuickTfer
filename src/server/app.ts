@@ -13,6 +13,15 @@ app.use(cors());
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
+// Security headers
+app.use((_req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "SAMEORIGIN");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  next();
+});
+
 // Uploads directory (uses /tmp on Vercel serverless environment)
 const isVercel = Boolean(process.env.VERCEL || process.env.NOW_REGION);
 const uploadsDir = isVercel
@@ -23,6 +32,62 @@ if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 app.use("/uploads", express.static(uploadsDir));
+
+// SEO Robots and Sitemap Fallbacks
+app.get("/robots.txt", (_req, res) => {
+  res.type("text/plain; charset=utf-8");
+  res.send(`User-agent: *
+Disallow: /p/
+Disallow: /paste/
+Disallow: /api/
+Disallow: /raw/
+Disallow: /uploads/
+Allow: /
+Allow: /burn-after-reading
+Allow: /encrypted-paste
+Allow: /quick-code
+Allow: /math-notes
+
+Sitemap: https://quicktrfr.vercel.app/sitemap.xml
+`);
+});
+
+app.get("/sitemap.xml", (_req, res) => {
+  res.type("application/xml; charset=utf-8");
+  res.send(`<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://quicktrfr.vercel.app/</loc>
+    <lastmod>2026-11-17</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://quicktrfr.vercel.app/burn-after-reading</loc>
+    <lastmod>2026-11-17</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://quicktrfr.vercel.app/encrypted-paste</loc>
+    <lastmod>2026-11-17</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://quicktrfr.vercel.app/quick-code</loc>
+    <lastmod>2026-11-17</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://quicktrfr.vercel.app/math-notes</loc>
+    <lastmod>2026-11-17</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+</urlset>`);
+});
 
 // API Routes
 app.use("/api", authRouter);

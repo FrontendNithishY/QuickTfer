@@ -86,7 +86,9 @@ export const PublishModal: React.FC<PublishModalProps> = ({
       <div className="relative w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-gray-100 dark:border-slate-800 p-6 sm:p-8 my-8 text-left">
         {/* Close Button */}
         <button
+          type="button"
           onClick={onClose}
+          aria-label="Close publish settings modal"
           className="absolute top-5 right-5 p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-800"
         >
           <X className="w-5 h-5" />

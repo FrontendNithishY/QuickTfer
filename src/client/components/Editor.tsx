@@ -242,6 +242,7 @@ export const Editor: React.FC<EditorProps> = ({
             onClick={() => exec("formatBlock", "<h1>")}
             className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-700"
             title="Heading 1"
+            aria-label="Format as Heading 1"
           >
             <Heading1 className="w-4 h-4" />
           </button>
@@ -250,6 +251,7 @@ export const Editor: React.FC<EditorProps> = ({
             onClick={() => exec("formatBlock", "<h2>")}
             className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-700"
             title="Heading 2"
+            aria-label="Format as Heading 2"
           >
             <Heading2 className="w-4 h-4" />
           </button>
@@ -258,6 +260,7 @@ export const Editor: React.FC<EditorProps> = ({
             onClick={() => exec("formatBlock", "<h3>")}
             className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-700"
             title="Heading 3"
+            aria-label="Format as Heading 3"
           >
             <Heading3 className="w-4 h-4" />
           </button>
@@ -269,6 +272,7 @@ export const Editor: React.FC<EditorProps> = ({
             onClick={() => exec("bold")}
             className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-700 font-bold"
             title="Bold (Ctrl+B)"
+            aria-label="Bold text"
           >
             <Bold className="w-4 h-4" />
           </button>
@@ -277,6 +281,7 @@ export const Editor: React.FC<EditorProps> = ({
             onClick={() => exec("italic")}
             className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-700"
             title="Italic (Ctrl+I)"
+            aria-label="Italic text"
           >
             <Italic className="w-4 h-4" />
           </button>
@@ -285,6 +290,7 @@ export const Editor: React.FC<EditorProps> = ({
             onClick={() => exec("underline")}
             className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-700"
             title="Underline (Ctrl+U)"
+            aria-label="Underline text"
           >
             <Underline className="w-4 h-4" />
           </button>
@@ -293,6 +299,7 @@ export const Editor: React.FC<EditorProps> = ({
             onClick={() => exec("strikeThrough")}
             className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-700"
             title="Strikethrough"
+            aria-label="Strikethrough text"
           >
             <Strikethrough className="w-4 h-4" />
           </button>
@@ -301,6 +308,7 @@ export const Editor: React.FC<EditorProps> = ({
             onClick={() => exec("formatBlock", "<pre>")}
             className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-700"
             title="Code Block"
+            aria-label="Insert code block"
           >
             <Code className="w-4 h-4" />
           </button>
@@ -309,6 +317,7 @@ export const Editor: React.FC<EditorProps> = ({
             onClick={() => exec("formatBlock", "<blockquote>")}
             className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-700"
             title="Quote"
+            aria-label="Format as blockquote"
           >
             <Quote className="w-4 h-4" />
           </button>
@@ -320,6 +329,7 @@ export const Editor: React.FC<EditorProps> = ({
             onClick={() => exec("insertUnorderedList")}
             className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-700"
             title="Bullet List"
+            aria-label="Insert bullet list"
           >
             <List className="w-4 h-4" />
           </button>
@@ -328,6 +338,7 @@ export const Editor: React.FC<EditorProps> = ({
             onClick={() => exec("insertOrderedList")}
             className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-700"
             title="Numbered List"
+            aria-label="Insert numbered list"
           >
             <ListOrdered className="w-4 h-4" />
           </button>
@@ -339,6 +350,7 @@ export const Editor: React.FC<EditorProps> = ({
             onClick={() => exec("justifyLeft")}
             className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-700"
             title="Align Left"
+            aria-label="Align text left"
           >
             <AlignLeft className="w-4 h-4" />
           </button>
@@ -347,6 +359,7 @@ export const Editor: React.FC<EditorProps> = ({
             onClick={() => exec("justifyCenter")}
             className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-700"
             title="Align Center"
+            aria-label="Align text center"
           >
             <AlignCenter className="w-4 h-4" />
           </button>
@@ -355,6 +368,7 @@ export const Editor: React.FC<EditorProps> = ({
             onClick={() => exec("justifyRight")}
             className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-700"
             title="Align Right"
+            aria-label="Align text right"
           >
             <AlignRight className="w-4 h-4" />
           </button>
@@ -366,6 +380,7 @@ export const Editor: React.FC<EditorProps> = ({
             onClick={promptLink}
             className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-700"
             title="Insert Link"
+            aria-label="Insert hyperlink"
           >
             <Link className="w-4 h-4" />
           </button>
@@ -374,6 +389,7 @@ export const Editor: React.FC<EditorProps> = ({
             onClick={() => fileInputRef.current?.click()}
             className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-700"
             title="Upload Image"
+            aria-label="Upload image"
           >
             <ImageIcon className="w-4 h-4" />
           </button>
@@ -383,6 +399,7 @@ export const Editor: React.FC<EditorProps> = ({
             onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0])}
             accept="image/*"
             className="hidden"
+            aria-hidden="true"
           />
 
           <button
@@ -390,6 +407,7 @@ export const Editor: React.FC<EditorProps> = ({
             onClick={promptYoutube}
             className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-700"
             title="Embed YouTube Video"
+            aria-label="Embed YouTube video"
           >
             <VideoIcon className="w-4 h-4 text-red-600" />
           </button>
@@ -398,6 +416,7 @@ export const Editor: React.FC<EditorProps> = ({
             onClick={insertTable}
             className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-700"
             title="Insert Table"
+            aria-label="Insert data table"
           >
             <TableIcon className="w-4 h-4" />
           </button>
@@ -406,6 +425,7 @@ export const Editor: React.FC<EditorProps> = ({
             onClick={promptMath}
             className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-700"
             title="Insert Math Formula (LaTeX)"
+            aria-label="Insert LaTeX math formula"
           >
             <Sigma className="w-4 h-4" />
           </button>
@@ -416,6 +436,7 @@ export const Editor: React.FC<EditorProps> = ({
             onClick={() => docInputRef.current?.click()}
             className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-700"
             title="Import text (.txt / .md)"
+            aria-label="Import text or markdown file"
           >
             <FileUp className="w-4 h-4" />
           </button>
@@ -425,6 +446,7 @@ export const Editor: React.FC<EditorProps> = ({
             onChange={handleDocImport}
             accept=".txt,.md"
             className="hidden"
+            aria-hidden="true"
           />
 
           <div className="w-px h-5 bg-gray-300 dark:bg-slate-700 mx-1" />
@@ -433,6 +455,7 @@ export const Editor: React.FC<EditorProps> = ({
             onClick={() => exec("insertHorizontalRule")}
             className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-700"
             title="Horizontal Divider"
+            aria-label="Insert horizontal divider line"
           >
             <Minus className="w-4 h-4" />
           </button>
@@ -441,6 +464,7 @@ export const Editor: React.FC<EditorProps> = ({
             onClick={() => exec("undo")}
             className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-700"
             title="Undo"
+            aria-label="Undo last action"
           >
             <Undo className="w-4 h-4" />
           </button>
@@ -449,6 +473,7 @@ export const Editor: React.FC<EditorProps> = ({
             onClick={() => exec("redo")}
             className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-700"
             title="Redo"
+            aria-label="Redo last action"
           >
             <Redo className="w-4 h-4" />
           </button>

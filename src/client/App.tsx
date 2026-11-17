@@ -17,6 +17,8 @@ import {
   QuickCodePage,
   MathNotesPage,
 } from "./components/LandingPages.js";
+import { NotFoundPage } from "./components/NotFoundPage.js";
+import { updateSEO } from "./utils/seo.js";
 import { getAuthToken, removeAuthToken, saveEditToken } from "./utils/storage.js";
 
 type RouteView =
@@ -27,7 +29,8 @@ type RouteView =
   | "burn-after-reading"
   | "encrypted-paste"
   | "quick-code"
-  | "math-notes";
+  | "math-notes"
+  | "404";
 
 export const App: React.FC = () => {
   const [view, setView] = useState<RouteView>("editor");
@@ -121,8 +124,15 @@ export const App: React.FC = () => {
         setView("quick-code");
       } else if (path === "/math-notes") {
         setView("math-notes");
-      } else {
+      } else if (path === "/" || path === "") {
         setView("editor");
+        updateSEO({
+          title: "QuickTrfr - Fast Paste, Transfer & 60-Minute Quick Sharing",
+          description: "QuickTrfr is an independent, fast and secure text publishing and transfer platform. Create rich notes, encrypt with AES-256-GCM, and share instantly anywhere using 60-minute quick codes and QR codes.",
+          canonicalPath: "/"
+        });
+      } else {
+        setView("404");
       }
     };
 
@@ -135,6 +145,14 @@ export const App: React.FC = () => {
     window.history.pushState({}, "", path);
     setView(newView);
     window.scrollTo(0, 0);
+
+    if (newView === "editor") {
+      updateSEO({
+        title: "QuickTrfr - Fast Paste, Transfer & 60-Minute Quick Sharing",
+        description: "QuickTrfr is an independent, fast and secure text publishing and transfer platform. Create rich notes, encrypt with AES-256-GCM, and share instantly anywhere using 60-minute quick codes and QR codes.",
+        canonicalPath: "/"
+      });
+    }
   };
 
   const handleLandingAction = (preset?: "burn" | "encrypt" | "quick" | "math") => {
@@ -297,6 +315,7 @@ export const App: React.FC = () => {
           <BurnAfterReadingPage
             onStartAction={handleLandingAction}
             onOpenQuickCode={() => setIsQuickCodeInputOpen(true)}
+            onNavigateLanding={(route) => navigateTo(route.slice(1) as any, route)}
           />
         )}
 
@@ -304,6 +323,7 @@ export const App: React.FC = () => {
           <EncryptedPastePage
             onStartAction={handleLandingAction}
             onOpenQuickCode={() => setIsQuickCodeInputOpen(true)}
+            onNavigateLanding={(route) => navigateTo(route.slice(1) as any, route)}
           />
         )}
 
@@ -311,6 +331,7 @@ export const App: React.FC = () => {
           <QuickCodePage
             onStartAction={handleLandingAction}
             onOpenQuickCode={() => setIsQuickCodeInputOpen(true)}
+            onNavigateLanding={(route) => navigateTo(route.slice(1) as any, route)}
           />
         )}
 
@@ -318,6 +339,15 @@ export const App: React.FC = () => {
           <MathNotesPage
             onStartAction={handleLandingAction}
             onOpenQuickCode={() => setIsQuickCodeInputOpen(true)}
+            onNavigateLanding={(route) => navigateTo(route.slice(1) as any, route)}
+          />
+        )}
+
+        {view === "404" && (
+          <NotFoundPage
+            onNavigateHome={() => navigateTo("editor", "/")}
+            onOpenQuickCode={() => setIsQuickCodeInputOpen(true)}
+            onNavigateLanding={(route) => navigateTo(route.slice(1) as any, route)}
           />
         )}
       </main>
@@ -337,7 +367,7 @@ export const App: React.FC = () => {
               </p>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-5 font-medium">
-              <button onClick={() => navigateTo("editor", "/")} className="hover:text-blue-600 transition">Create Note</button>
+              <a href="/" onClick={(e) => { e.preventDefault(); navigateTo("editor", "/"); }} className="hover:text-blue-600 transition">Create Note</a>
               <button onClick={() => setIsQuickCodeInputOpen(true)} className="hover:text-blue-600 transition">Quick Code</button>
               <button onClick={() => setIsAboutOpen(true)} className="hover:text-blue-600 transition">About</button>
               <button onClick={() => setIsTermsOpen(true)} className="hover:text-blue-600 transition">Terms & Privacy</button>
@@ -348,12 +378,12 @@ export const App: React.FC = () => {
           {/* Programmatic Intent Landing Navigation for SEO */}
           <div className="pt-4 border-t border-gray-100 dark:border-slate-800/60 flex flex-wrap items-center justify-center sm:justify-start gap-x-6 gap-y-2 text-[11px] text-gray-400 dark:text-gray-500">
             <span className="font-semibold text-gray-600 dark:text-gray-400">Features & Solutions:</span>
-            <button onClick={() => navigateTo("burn-after-reading", "/burn-after-reading")} className="hover:text-blue-600 transition">Burn After Reading</button>
-            <button onClick={() => navigateTo("encrypted-paste", "/encrypted-paste")} className="hover:text-blue-600 transition">Encrypted Pastebin</button>
-            <button onClick={() => navigateTo("quick-code", "/quick-code")} className="hover:text-blue-600 transition">PIN Transfer (PC to Mobile)</button>
-            <button onClick={() => navigateTo("math-notes", "/math-notes")} className="hover:text-blue-600 transition">LaTeX Math Notes</button>
-            <a href="/sitemap.xml" target="_blank" className="hover:text-blue-600 transition">Sitemap</a>
-            <a href="/robots.txt" target="_blank" className="hover:text-blue-600 transition">Robots.txt</a>
+            <a href="/burn-after-reading" onClick={(e) => { e.preventDefault(); navigateTo("burn-after-reading", "/burn-after-reading"); }} className="hover:text-blue-600 transition">Burn After Reading</a>
+            <a href="/encrypted-paste" onClick={(e) => { e.preventDefault(); navigateTo("encrypted-paste", "/encrypted-paste"); }} className="hover:text-blue-600 transition">Encrypted Pastebin</a>
+            <a href="/quick-code" onClick={(e) => { e.preventDefault(); navigateTo("quick-code", "/quick-code"); }} className="hover:text-blue-600 transition">PIN Transfer (PC to Mobile)</a>
+            <a href="/math-notes" onClick={(e) => { e.preventDefault(); navigateTo("math-notes", "/math-notes"); }} className="hover:text-blue-600 transition">LaTeX Math Notes</a>
+            <a href="/sitemap.xml" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 transition">Sitemap</a>
+            <a href="/robots.txt" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 transition">Robots.txt</a>
           </div>
         </div>
       </footer>
