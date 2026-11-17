@@ -6,6 +6,7 @@ import authRouter from "./routes/auth.js";
 import pastesRouter from "./routes/pastes.js";
 import quickShareRouter from "./routes/quickShare.js";
 import uploadRouter from "./routes/upload.js";
+import aiRouter from "./routes/ai.js";
 
 export const app = express();
 
@@ -94,6 +95,7 @@ app.use("/api", authRouter);
 app.use("/api", pastesRouter);
 app.use("/api", quickShareRouter);
 app.use("/api", uploadRouter);
+app.use("/api", aiRouter);
 
 // Raw paste direct route alias (e.g., /raw/:slug)
 app.get("/raw/:slug", (req, res, next) => {

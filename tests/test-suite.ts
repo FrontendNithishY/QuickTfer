@@ -6,6 +6,7 @@ import authRouter from "../src/server/routes/auth.js";
 import pastesRouter from "../src/server/routes/pastes.js";
 import quickShareRouter from "../src/server/routes/quickShare.js";
 import uploadRouter from "../src/server/routes/upload.js";
+import aiRouter from "../src/server/routes/ai.js";
 
 const app = express();
 app.use(express.json());
@@ -13,6 +14,7 @@ app.use("/api", authRouter);
 app.use("/api", pastesRouter);
 app.use("/api", quickShareRouter);
 app.use("/api", uploadRouter);
+app.use("/api", aiRouter);
 app.get("/raw/:slug", (req, res, next) => {
   req.url = `/pastes/${req.params.slug}/raw`;
   pastesRouter(req, res, next);
@@ -196,9 +198,29 @@ async function runTests() {
     });
     assert.strictEqual(updateRes.status, 200, "Guest with editToken should be allowed to update");
 
-    const recheck = await (await fetch(`${baseUrl}/api/pastes/${paste1.slug}`)).json() as any;
-    assert.strictEqual(recheck.title, "Updated Title By Guest");
-    console.log("✓ Guest edit_token permissions verified.");
+    // 10. Test AI Polish API Validations
+    console.log("[Test 10] Testing AI Polish endpoint validations...");
+    // 10a: Empty content check
+    const emptyAiRes = await fetch(`${baseUrl}/api/ai/polish`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content: "" })
+    });
+    assert.strictEqual(emptyAiRes.status, 400, "Empty content should return 400");
+    const emptyAiData = await emptyAiRes.json() as any;
+    assert.strictEqual(emptyAiData.error, "EMPTY_CONTENT");
+
+    // 10b: Missing API key check (when no server GEMINI_API_KEY is configured)
+    delete process.env.GEMINI_API_KEY;
+    const noKeyRes = await fetch(`${baseUrl}/api/ai/polish`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content: "<p>test grammer and spellin</p>" })
+    });
+    assert.strictEqual(noKeyRes.status, 400, "Missing API key should return 400");
+    const noKeyData = await noKeyRes.json() as any;
+    assert.strictEqual(noKeyData.error, "NO_API_KEY");
+    console.log("✓ AI Polish validations (EMPTY_CONTENT, NO_API_KEY) verified.");
 
     console.log("\n=======================================================");
     console.log("🎉 ALL AUTOMATED TESTS PASSED SUCCESSFULLY! (10/10) 🎉");

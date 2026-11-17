@@ -24,7 +24,11 @@ import {
   Redo,
   Sparkles,
   FileUp,
-  Minus
+  Minus,
+  Key,
+  X,
+  ExternalLink,
+  Check
 } from "lucide-react";
 import katex from "katex";
 
@@ -46,6 +50,86 @@ export const Editor: React.FC<EditorProps> = ({
   const editorRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const docInputRef = useRef<HTMLInputElement>(null);
+
+  // AI Polish states
+  const [isPolishing, setIsPolishing] = useState(false);
+  const [previousContent, setPreviousContent] = useState<string | null>(null);
+  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
+  const [apiKeyInput, setApiKeyInput] = useState(() => localStorage.getItem("sharepaste_gemini_key") || "");
+  const [aiNotice, setAiNotice] = useState<string | null>(null);
+
+  const handleAiPolish = async () => {
+    if (!editorRef.current) return;
+    const currentHtml = editorRef.current.innerHTML || "";
+    const rawText = editorRef.current.innerText || "";
+    if (!rawText.trim() || rawText.trim() === "") {
+      alert("Please write or paste some text before using AI Polish.");
+      return;
+    }
+
+    setIsPolishing(true);
+    setAiNotice(null);
+
+    try {
+      const storedKey = localStorage.getItem("sharepaste_gemini_key")?.trim() || undefined;
+      const res = await fetch("/api/ai/polish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          content: currentHtml,
+          apiKey: storedKey
+        })
+      });
+
+      const data = await res.json();
+
+      if (res.status === 400 && data.error === "NO_API_KEY") {
+        setShowApiKeyModal(true);
+        setIsPolishing(false);
+        return;
+      }
+
+      if (!res.ok || !data.success) {
+        if (data.error === "INVALID_API_KEY") {
+          setShowApiKeyModal(true);
+        }
+        alert(data.message || "AI Polish failed. Please try again.");
+        setIsPolishing(false);
+        return;
+      }
+
+      // Success: Save previous content for one-click Revert
+      setPreviousContent(currentHtml);
+      editorRef.current.innerHTML = data.polishedContent;
+      updateStats();
+      setAiNotice("Grammar polished, phrasing refined, and paragraphs auto-aligned.");
+    } catch (err: any) {
+      console.error("AI polish error:", err);
+      alert("Failed to connect to AI polish service.");
+    } finally {
+      setIsPolishing(false);
+    }
+  };
+
+  const handleRevert = () => {
+    if (previousContent !== null && editorRef.current) {
+      editorRef.current.innerHTML = previousContent;
+      setPreviousContent(null);
+      setAiNotice(null);
+      updateStats();
+    }
+  };
+
+  const handleSaveApiKey = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = apiKeyInput.trim();
+    if (trimmed) {
+      localStorage.setItem("sharepaste_gemini_key", trimmed);
+    } else {
+      localStorage.removeItem("sharepaste_gemini_key");
+    }
+    setShowApiKeyModal(false);
+  };
 
   // Initialize initial content
   useEffect(() => {
@@ -477,7 +561,63 @@ export const Editor: React.FC<EditorProps> = ({
           >
             <Redo className="w-4 h-4" />
           </button>
+
+          {/* AI Polish & Grammar Auto-Align Button */}
+          <div className="sm:ml-auto flex items-center gap-1.5 my-0.5">
+            {previousContent !== null && (
+              <button
+                type="button"
+                onClick={handleRevert}
+                className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-300/80 dark:border-amber-700/80 transition"
+                title="Undo AI changes and restore original text"
+              >
+                <Undo className="w-3.5 h-3.5" />
+                <span>Revert AI</span>
+              </button>
+            )}
+
+            <div className="inline-flex items-center rounded-lg border border-purple-200 dark:border-purple-800/80 bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-950/40 dark:to-indigo-950/40 shadow-sm overflow-hidden">
+              <button
+                type="button"
+                onClick={handleAiPolish}
+                disabled={isPolishing}
+                className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-purple-700 dark:text-purple-300 hover:bg-purple-100/70 dark:hover:bg-purple-900/60 transition disabled:opacity-60 cursor-pointer"
+                title="AI Polish: Rephrase grammar, fix spelling, and auto-align paragraphs"
+              >
+                <Sparkles className={`w-3.5 h-3.5 text-purple-600 dark:text-purple-400 ${isPolishing ? "animate-spin" : ""}`} />
+                <span>{isPolishing ? "Polishing with AI..." : "AI Polish"}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowApiKeyModal(true)}
+                className="p-1.5 text-purple-600/80 dark:text-purple-400/80 hover:text-purple-900 dark:hover:text-purple-100 hover:bg-purple-100/70 dark:hover:bg-purple-900/60 transition border-l border-purple-200/80 dark:border-purple-800/80 cursor-pointer"
+                title="Configure Free Gemini AI Key"
+                aria-label="Configure Free Gemini Key"
+              >
+                <Key className="w-3 h-3" />
+              </button>
+            </div>
+          </div>
         </div>
+
+        {/* AI Notice Banner */}
+        {aiNotice && (
+          <div className="px-6 py-2 bg-gradient-to-r from-purple-500/10 via-indigo-500/10 to-blue-500/10 border-b border-purple-200/70 dark:border-purple-900/40 flex items-center justify-between text-xs text-purple-900 dark:text-purple-300">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0" />
+              <span><strong>AI Polished:</strong> {aiNotice}</span>
+            </div>
+            {previousContent !== null && (
+              <button
+                type="button"
+                onClick={handleRevert}
+                className="underline hover:no-underline font-bold ml-4 text-purple-700 dark:text-purple-300 hover:text-purple-950 flex items-center gap-1 shrink-0"
+              >
+                <Undo className="w-3 h-3" /> Revert to original
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Editor Writing Canvas */}
         <div
@@ -509,6 +649,104 @@ export const Editor: React.FC<EditorProps> = ({
         </div>
 
       </div>
+
+      {/* Free Gemini API Key Setup Modal */}
+      {showApiKeyModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl relative">
+            <button
+              type="button"
+              onClick={() => setShowApiKeyModal(false)}
+              className="absolute top-5 right-5 p-2 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-800 transition"
+              aria-label="Close modal"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-purple-500/25">
+                <Sparkles className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white">AI Polish Setup</h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400">100% Free via Google Gemini 1.5 Flash</p>
+              </div>
+            </div>
+
+            <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed mb-4">
+              SharePaste uses <strong>Google Gemini 1.5 Flash</strong> to rephrase awkward grammar, eliminate typos, and cleanly align your paragraphs into semantic blocks while preserving formulas and code.
+            </p>
+
+            <div className="bg-purple-50 dark:bg-purple-950/40 border border-purple-200/80 dark:border-purple-800/60 rounded-2xl p-4 mb-5 text-xs text-purple-900 dark:text-purple-200 space-y-2">
+              <div className="font-semibold flex items-center gap-1.5 text-purple-800 dark:text-purple-300">
+                <Check className="w-4 h-4 text-emerald-500" /> Free Tier: 1,500 requests/day at zero cost
+              </div>
+              <p>
+                Get your free API key in under 30 seconds (no credit card required):
+              </p>
+              <a
+                href="https://aistudio.google.com/app/apikey"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 font-bold text-purple-700 dark:text-purple-300 underline hover:text-purple-900 dark:hover:text-white"
+              >
+                <span>Open Google AI Studio</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </div>
+
+            <form onSubmit={handleSaveApiKey} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
+                  Google Gemini API Key
+                </label>
+                <input
+                  type="password"
+                  value={apiKeyInput}
+                  onChange={(e) => setApiKeyInput(e.target.value)}
+                  placeholder="AIzaSy..."
+                  className="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 text-gray-900 dark:text-white text-sm outline-none focus:ring-2 focus:ring-purple-500 font-mono"
+                />
+                <p className="text-[11px] text-gray-400 mt-1">
+                  Your key is saved locally in your browser and used strictly to polish your paste.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-between pt-2">
+                {apiKeyInput ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      localStorage.removeItem("sharepaste_gemini_key");
+                      setApiKeyInput("");
+                      setShowApiKeyModal(false);
+                    }}
+                    className="text-xs text-rose-500 hover:text-rose-600 font-medium"
+                  >
+                    Remove Saved Key
+                  </button>
+                ) : <div />}
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowApiKeyModal(false)}
+                    className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-sm font-bold shadow-md shadow-purple-600/25 transition cursor-pointer"
+                  >
+                    Save & Continue
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
