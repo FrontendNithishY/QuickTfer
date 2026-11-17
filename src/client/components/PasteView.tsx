@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Paste, Comment, QuickShareData } from "../types.js";
 import { getEditToken } from "../utils/storage.js";
 import {
@@ -22,6 +22,7 @@ import {
   AlertTriangle,
   ChevronDown
 } from "lucide-react";
+import { InteractiveCodeViewer } from "./InteractiveCodeViewer.js";
 
 interface PasteViewProps {
   slug: string;
@@ -432,12 +433,35 @@ export const PasteView: React.FC<PasteViewProps> = ({
               </button>
             </form>
           </div>
-        ) : (
-          <div
-            dangerouslySetInnerHTML={{ __html: paste.content || "" }}
-            className="paste-content min-h-[250px]"
-          />
-        )}
+        ) : (() => {
+          const isInteractiveCode = paste.content?.includes("SHAREPASTE_INTERACTIVE_CODE_V1");
+          if (isInteractiveCode) {
+            try {
+              const jsonStr = (paste.content || "")
+                .replace(/^[\s\S]*?<!-- SHAREPASTE_INTERACTIVE_CODE_V1 -->\s*/, "")
+                .trim();
+              const payload = JSON.parse(jsonStr);
+              return (
+                <InteractiveCodeViewer
+                  initialCode={payload.code || ""}
+                  language={payload.lang || "Code"}
+                  title={paste.title}
+                  initialOutput={payload.output}
+                  onFork={() => onFork(paste.title, paste.content || "")}
+                  onShare={handleQuickShare}
+                />
+              );
+            } catch (err) {
+              console.error("Code parse error:", err);
+            }
+          }
+          return (
+            <div
+              dangerouslySetInnerHTML={{ __html: paste.content || "" }}
+              className="paste-content min-h-[250px]"
+            />
+          );
+        })()}
       </div>
 
       {/* Comments Section */}

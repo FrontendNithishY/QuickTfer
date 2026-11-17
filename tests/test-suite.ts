@@ -236,10 +236,38 @@ async function runTests() {
     const getCodePaste = await (await fetch(`${baseUrl}/api/pastes/${codePasteData.slug}`)).json() as any;
     assert.ok(getCodePaste.content.includes("code-highlight-container"));
     assert.ok(getCodePaste.content.includes("const x = 42;"));
-    console.log("✓ Code highlighted container created and verified in database.");
+    // 12. Test Direct Interactive Code Compiler Publishing
+    console.log("[Test 12] Testing Direct Interactive Code Compiler Publishing...");
+    const compilerPayload = `<!-- SHAREPASTE_INTERACTIVE_CODE_V1 -->\n` + JSON.stringify({
+      lang: "Python",
+      langId: "python",
+      code: "def add(a, b):\n    return a + b\n\nprint(add(10, 32))",
+      output: "42\n[Exit Code 0]"
+    });
+
+    const directPublishRes = await fetch(`${baseUrl}/api/pastes`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: "Python Addition Script",
+        content: compilerPayload,
+        visibility: "public"
+      })
+    });
+    assert.strictEqual(directPublishRes.status, 201);
+    const directData = await directPublishRes.json() as any;
+    assert.ok(directData.slug);
+
+    const fetchedDirect = await (await fetch(`${baseUrl}/api/pastes/${directData.slug}`)).json() as any;
+    assert.ok(fetchedDirect.content.includes("SHAREPASTE_INTERACTIVE_CODE_V1"));
+    const parsedPayload = JSON.parse(fetchedDirect.content.replace(/^[\s\S]*?<!-- SHAREPASTE_INTERACTIVE_CODE_V1 -->\s*/, ""));
+    assert.strictEqual(parsedPayload.lang, "Python");
+    assert.ok(parsedPayload.code.includes("def add"));
+    assert.ok(parsedPayload.output.includes("42"));
+    console.log("✓ Direct interactive compiler code paste published and verified.");
 
     console.log("\n=======================================================");
-    console.log("🎉 ALL AUTOMATED TESTS PASSED SUCCESSFULLY! (11/11) 🎉");
+    console.log("🎉 ALL AUTOMATED TESTS PASSED SUCCESSFULLY! (12/12) 🎉");
     console.log("=======================================================\n");
   } finally {
     server.close();

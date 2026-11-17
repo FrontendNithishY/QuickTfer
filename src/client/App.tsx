@@ -256,6 +256,10 @@ export const App: React.FC = () => {
             initialTitle={forkDraft?.title || ""}
             initialContent={forkDraft?.content || ""}
             onPublishClick={handleOpenPublish}
+            onPublishSuccess={(slug) => {
+              setCurrentSlug(slug);
+              navigateTo("paste", `/p/${slug}`);
+            }}
           />
         )}
 

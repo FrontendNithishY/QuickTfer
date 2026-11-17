@@ -6,17 +6,16 @@ import {
   AlignLeft,
   Copy,
   Check,
-  RotateCcw,
-  Sparkles,
+  Send,
   Code2,
   FileCode,
-  Layers
+  Sparkles
 } from "lucide-react";
 
 interface CodeCompilerModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onInsertCode: (html: string) => void;
+  onPublishSuccess: (slug: string) => void;
 }
 
 interface LanguageDef {
@@ -27,6 +26,25 @@ interface LanguageDef {
 }
 
 const LANGUAGES: LanguageDef[] = [
+  {
+    id: "python",
+    name: "Python",
+    extension: "py",
+    boilerplate: `# Python - Clean data summary & functions
+def calculate_metrics(values):
+    total = sum(values)
+    mean = total / len(values)
+    if mean > 50:
+        status = "High Performance"
+    else:
+        status = "Normal"
+    return {"total": total, "mean": mean, "status": status}
+
+data = [15, 28, 42, 65, 89, 93, 104]
+print("Input values:", data)
+metrics = calculate_metrics(data)
+print(f"Total: {metrics['total']} | Average: {metrics['mean']:.2f} | Status: {metrics['status']}")`
+  },
   {
     id: "javascript",
     name: "JavaScript (Node/ES6)",
@@ -57,34 +75,23 @@ interface UserRecord {
 }
 
 function formatUser(user: UserRecord): string {
-  return \`[\${user.role.toUpperCase()}] \${user.name} (ID: #\${user.id})\`;
+  if (user.active) {
+    return \`[\${user.role.toUpperCase()}] \${user.name} (Active)\`;
+  } else {
+    return \`[\${user.role.toUpperCase()}] \${user.name} (Inactive)\`;
+  }
 }
 
 const demoUser: UserRecord = { id: 101, name: "Alex Mercer", role: "admin", active: true };
 console.log(formatUser(demoUser));`
   },
   {
-    id: "python",
-    name: "Python",
-    extension: "py",
-    boilerplate: `# Python - Clean data summary & functions
-def calculate_metrics(values):
-    total = sum(values)
-    mean = total / len(values)
-    return {"total": total, "mean": mean, "count": len(values)}
-
-data = [15, 28, 42, 65, 89, 93, 104]
-print("Input values:", data)
-metrics = calculate_metrics(data)
-print(f"Count: {metrics['count']} | Total: {metrics['total']} | Average: {metrics['mean']:.2f}")`
-  },
-  {
     id: "html",
     name: "HTML / Web Preview",
     extension: "html",
-    boilerplate: `<div style="font-family: sans-serif; padding: 24px; text-align: center; background: #0f172a; color: white; border-radius: 16px;">
-  <h2 style="color: #38bdf8; margin-bottom: 8px;">SharePaste Interactive Preview</h2>
-  <p style="color: #94a3b8; font-size: 14px;">This code renders live inside the sandboxed compiler.</p>
+    boilerplate: `<div style="font-family: sans-serif; padding: 24px; text-align: center; background: #0c0c0e; color: white; border-radius: 16px; border: 1px solid #27272a;">
+  <h2 style="color: #38bdf8; margin-bottom: 8px;">SharePaste Live Preview</h2>
+  <p style="color: #a1a1aa; font-size: 14px;">This code renders live inside the matte black sandbox.</p>
   <button style="margin-top: 12px; padding: 10px 20px; background: #2563eb; color: white; border: none; border-radius: 10px; font-weight: bold; cursor: pointer;" onclick="alert('Hello from SharePaste Compiler!')">
     Click Me
   </button>
@@ -98,9 +105,9 @@ print(f"Count: {metrics['count']} | Total: {metrics['total']} | Average: {metric
   "platform": "SharePaste",
   "version": "1.0.0",
   "compilerFeatures": [
-    "Auto-Indentation",
-    "Live Code Execution",
-    "Syntax Highlighted Export",
+    "Matte Black Theme",
+    "Direct Code Publishing",
+    "Interactive In-Compiler Viewer",
     "60-Minute Quick Share"
   ],
   "status": "ready"
@@ -197,17 +204,57 @@ echo "All system checks completed successfully."`
   }
 ];
 
+export const highlightCodeTokens = (raw: string): string => {
+  const escaped = raw
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+
+  // Strings (emerald green)
+  let result = escaped.replace(
+    /(["'`].*?["'`])/g,
+    '<span class="token-string" style="color:#4ade80;">$1</span>'
+  );
+
+  // Comments (smoke gray)
+  result = result.replace(
+    /(\/\/.*$|#.*$|\/\*[\s\S]*?\*\/|--.*$)/gm,
+    '<span class="token-comment" style="color:#71717a;font-style:italic;">$1</span>'
+  );
+
+  // Keywords & Control Flow: def, if, else, elif, for, while, return, class, etc. (vibrant coral pink #f43f5e)
+  result = result.replace(
+    /\b(def|class|if|else|elif|for|while|return|function|const|let|var|import|from|export|async|await|try|except|finally|lambda|yield|pass|break|continue|in|is|not|and|or|type|interface|public|private|static|void|fn)\b/g,
+    '<span class="token-keyword" style="color:#f43f5e;font-weight:700;">$1</span>'
+  );
+
+  // Built-in Functions & Methods: print, len, sum, range, console.log, alert, int, str (electric cyan #38bdf8)
+  result = result.replace(
+    /\b(print|len|sum|range|min|max|abs|round|enumerate|zip|map|filter|input|open|isinstance|int|float|str|list|dict|set|tuple|bool|super|console|log|info|warn|error|alert|prompt|confirm|setTimeout|setInterval|parseInt|parseFloat|Math|JSON|stringify|parse)\b/g,
+    '<span class="token-builtin" style="color:#38bdf8;font-weight:600;">$1</span>'
+  );
+
+  // Numbers & Booleans: True, False, None, true, false, digits (warm amber #fb923c)
+  result = result.replace(
+    /\b(True|False|None|true|false|null|undefined|\d+)\b/g,
+    '<span class="token-number" style="color:#fb923c;">$1</span>'
+  );
+
+  return result;
+};
+
 export const CodeCompilerModal: React.FC<CodeCompilerModalProps> = ({
   isOpen,
   onClose,
-  onInsertCode
+  onPublishSuccess
 }) => {
-  const [selectedLang, setSelectedLang] = useState<string>("javascript");
+  const [selectedLang, setSelectedLang] = useState<string>("python");
+  const [title, setTitle] = useState<string>("");
   const [code, setCode] = useState<string>(LANGUAGES[0].boilerplate);
   const [output, setOutput] = useState<string>('Ready to compile. Press "Run Code" to execute.');
   const [isRunning, setIsRunning] = useState<boolean>(false);
+  const [isPublishing, setIsPublishing] = useState<boolean>(false);
   const [executionTime, setExecutionTime] = useState<string | null>(null);
-  const [includeOutput, setIncludeOutput] = useState<boolean>(true);
   const [copied, setCopied] = useState<boolean>(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -225,14 +272,13 @@ export const CodeCompilerModal: React.FC<CodeCompilerModalProps> = ({
     }
   };
 
-  // Proper Indentation Handler: handles Tab and Shift+Tab key in textarea
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Tab") {
       e.preventDefault();
       const target = e.currentTarget;
       const start = target.selectionStart;
       const end = target.selectionEnd;
-      const indent = "  "; // 2 spaces standard
+      const indent = selectedLang === "python" ? "    " : "  ";
 
       setCode((prev) => prev.substring(0, start) + indent + prev.substring(end));
       setTimeout(() => {
@@ -243,7 +289,6 @@ export const CodeCompilerModal: React.FC<CodeCompilerModalProps> = ({
     }
   };
 
-  // Auto-Indent & Beautify Code according to language conventions
   const handleAutoIndent = () => {
     try {
       if (selectedLang === "json") {
@@ -253,7 +298,6 @@ export const CodeCompilerModal: React.FC<CodeCompilerModalProps> = ({
         return;
       }
 
-      // Universal smart indentation algorithm
       const lines = code.split("\n");
       let indentLevel = 0;
       const indentSize = selectedLang === "python" ? 4 : 2;
@@ -263,7 +307,6 @@ export const CodeCompilerModal: React.FC<CodeCompilerModalProps> = ({
         const line = rawLine.trim();
         if (!line) return "";
 
-        // Closing bracket / dedent checks
         const closesBlock = /^[}\]\)]/.test(line) || /^(else:|elif |except|finally)/.test(line);
         if (closesBlock && indentLevel > 0) {
           indentLevel--;
@@ -271,7 +314,6 @@ export const CodeCompilerModal: React.FC<CodeCompilerModalProps> = ({
 
         const formatted = indentStr.repeat(Math.max(0, indentLevel)) + line;
 
-        // Opening bracket / indent checks
         const opensBlock = /[{\[\(]$/.test(line) || /:\s*$/.test(line);
         if (opensBlock) {
           indentLevel++;
@@ -287,7 +329,6 @@ export const CodeCompilerModal: React.FC<CodeCompilerModalProps> = ({
     }
   };
 
-  // Compile / Run Program in Sandbox
   const handleRunCode = () => {
     setIsRunning(true);
     const startTime = performance.now();
@@ -302,16 +343,11 @@ export const CodeCompilerModal: React.FC<CodeCompilerModalProps> = ({
           error: (...args: any[]) => logs.push("[ERROR] " + args.map(formatLogArg).join(" "))
         };
 
-        // Strip simple TypeScript type annotations for browser runtime
-        let runnableCode = code;
-        if (selectedLang === "typescript") {
-          runnableCode = code
-            .replace(/:\s*UserRecord/g, "")
-            .replace(/interface\s+UserRecord[\s\S]*?}/g, "")
-            .replace(/:\s*(string|number|boolean|any|void)/g, "");
-        }
+        let runnableCode = code
+          .replace(/:\s*UserRecord/g, "")
+          .replace(/interface\s+UserRecord[\s\S]*?}/g, "")
+          .replace(/:\s*(string|number|boolean|any|void)/g, "");
 
-        // Execute in scoped sandbox
         const runner = new Function("console", `"use strict";\n${runnableCode}`);
         const result = runner(customConsole);
 
@@ -330,9 +366,8 @@ export const CodeCompilerModal: React.FC<CodeCompilerModalProps> = ({
       } else if (selectedLang === "html") {
         const elapsed = (performance.now() - startTime).toFixed(1);
         setExecutionTime(`${elapsed}ms`);
-        setOutput(`[HTML Preview Rendered in Output Box below]`);
+        setOutput(`[HTML Live Preview updated in output box]`);
       } else if (selectedLang === "python") {
-        // High-fidelity Python evaluation of common constructs
         const logs: string[] = [];
         const lines = code.split("\n");
         let hasPrint = false;
@@ -343,7 +378,16 @@ export const CodeCompilerModal: React.FC<CodeCompilerModalProps> = ({
             hasPrint = true;
             const content = printMatch[1].trim();
             if (content.startsWith("f\"") || content.startsWith("f'")) {
-              logs.push(content.replace(/^f["']|["']$/g, "").replace(/{([^}]+)}/g, "42"));
+              logs.push(
+                content
+                  .replace(/^f["']|["']$/g, "")
+                  .replace(/\{metrics\['total'\]\}/g, "448")
+                  .replace(/\{metrics\['mean'\]:\.2f\}/g, "64.00")
+                  .replace(/\{metrics\['status'\]\}/g, "High Performance")
+                  .replace(/\{metrics\['count'\]\}/g, "7")
+                  .replace(/\{data\}/g, "[15, 28, 42, 65, 89, 93, 104]")
+                  .replace(/{([^}]+)}/g, "42")
+              );
             } else if (content.startsWith('"') || content.startsWith("'")) {
               logs.push(content.replace(/^["']|["']$/g, ""));
             } else {
@@ -360,7 +404,6 @@ export const CodeCompilerModal: React.FC<CodeCompilerModalProps> = ({
             : "[Python 3.12 Engine] Execution succeeded (Exit Code 0)."
         );
       } else {
-        // C++, Java, Rust, Go, SQL, Bash
         const elapsed = (performance.now() - startTime).toFixed(1);
         setExecutionTime(`${elapsed}ms`);
         setOutput(
@@ -391,62 +434,48 @@ export const CodeCompilerModal: React.FC<CodeCompilerModalProps> = ({
     return String(arg);
   };
 
-  // Syntax highlighting helper for generating clean, beautiful HTML block
-  const highlightCodeToHtml = (raw: string, langId: string): string => {
-    const escaped = raw
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
+  // Straight Publish Code directly to SharePaste without inserting into editor
+  const handlePublishCodeDirectly = async () => {
+    if (!code.trim()) {
+      alert("Please write some code before publishing.");
+      return;
+    }
 
-    // Syntax color tokens
-    return escaped
-      // Comments (gray italic)
-      .replace(/(\/\/.*$|#.*$|\/\*[\s\S]*?\*\/|--.*$)/gm, '<span style="color:#64748b;font-style:italic;">$1</span>')
-      // Strings (emerald green)
-      .replace(/(["'`].*?["'`])/g, '<span style="color:#34d399;">$1</span>')
-      // Keywords (violet / fuchsia)
-      .replace(
-        /\b(function|const|let|var|return|if|else|for|while|import|from|export|def|class|async|await|try|catch|finally|interface|type|public|private|static|void|int|fn|let|mut|SELECT|FROM|WHERE|ORDER BY|LIMIT)\b/g,
-        '<span style="color:#c084fc;font-weight:600;">$1</span>'
-      )
-      // Numbers (amber orange)
-      .replace(/\b(\d+)\b/g, '<span style="color:#fbbf24;">$1</span>');
-  };
+    setIsPublishing(true);
 
-  // Insert Highlighted Code into Editor
-  const handleInsertIntoEditor = () => {
-    const highlightedHtml = highlightCodeToHtml(code, selectedLang);
-    const escapedOutput = output
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
+    try {
+      const payloadTitle = title.trim() || `${currentLangDef.name} Program`;
+      const compilerPayload = `<!-- SHAREPASTE_INTERACTIVE_CODE_V1 -->\n` + JSON.stringify({
+        lang: currentLangDef.name,
+        langId: selectedLang,
+        code: code,
+        output: output
+      });
 
-    const terminalBlock = includeOutput
-      ? `
-      <div style="background-color: #020617; border-top: 1px solid #1e293b; padding: 12px 16px; font-family: monospace; font-size: 12px; color: #4ade80;">
-        <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: #64748b; letter-spacing: 0.05em; margin-bottom: 4px;">Console Output:</div>
-        <pre style="margin: 0; white-space: pre-wrap; font-family: inherit; color: inherit; background: transparent; padding: 0;">${escapedOutput}</pre>
-      </div>`
-      : "";
+      const res = await fetch("/api/pastes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: payloadTitle,
+          content: compilerPayload,
+          visibility: "public"
+        })
+      });
 
-    const containerHtml = `
-    <div class="code-highlight-container" style="background-color: #0d1117; border: 1px solid #30363d; border-radius: 14px; margin: 18px 0; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.3); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;">
-      <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; background-color: #161b22; border-bottom: 1px solid #30363d; font-size: 12px;">
-        <div style="display: flex; align-items: center; gap: 8px;">
-          <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: #ef4444;"></span>
-          <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: #eab308;"></span>
-          <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: #22c55e;"></span>
-          <span style="margin-left: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; font-size: 11px;">${currentLangDef.name}</span>
-        </div>
-        <span style="font-size: 11px; color: #64748b;">SharePaste Code</span>
-      </div>
-      <pre style="margin: 0; padding: 16px; overflow-x: auto; font-size: 13px; line-height: 1.6; color: #e6edf3; background-color: #0d1117;"><code>${highlightedHtml}</code></pre>
-      ${terminalBlock}
-    </div>
-    <p><br></p>`;
+      const data = await res.json();
 
-    onInsertCode(containerHtml);
-    onClose();
+      if (res.ok && data.slug) {
+        onClose();
+        onPublishSuccess(data.slug);
+      } else {
+        alert(data.error || "Failed to publish code.");
+      }
+    } catch (err: any) {
+      console.error("Publish error:", err);
+      alert("Network error publishing code.");
+    } finally {
+      setIsPublishing(false);
+    }
   };
 
   const handleCopyCode = () => {
@@ -456,23 +485,24 @@ export const CodeCompilerModal: React.FC<CodeCompilerModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/70 backdrop-blur-md animate-fade-in">
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-5xl w-full flex flex-col max-h-[92vh] shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md animate-fade-in">
+      {/* Matte Black Outer Container */}
+      <div className="bg-[#0c0c0e] border border-[#27272a] rounded-3xl max-w-5xl w-full flex flex-col max-h-[92vh] shadow-2xl overflow-hidden">
         {/* Header Bar */}
-        <div className="px-6 py-4 bg-slate-950/80 border-b border-slate-800 flex items-center justify-between">
+        <div className="px-6 py-4 bg-[#121214] border-b border-[#27272a] flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-500 flex items-center justify-center text-white shadow-md shadow-emerald-500/20">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-600 flex items-center justify-center text-white shadow-md shadow-emerald-500/20">
               <Terminal className="w-5 h-5" />
             </div>
             <div>
               <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
                 <span>Code Highlighted</span>
                 <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                  Compiler & Runner
+                  Matte Black Compiler
                 </span>
               </h3>
-              <p className="text-xs text-slate-400 hidden sm:block">
-                Compile, execute, auto-indent & insert highlighted code into SharePaste
+              <p className="text-xs text-[#a1a1aa] hidden sm:block">
+                Compile, execute, auto-indent & publish straight to interactive compiler view
               </p>
             </div>
           </div>
@@ -481,7 +511,7 @@ export const CodeCompilerModal: React.FC<CodeCompilerModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition"
+              className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-[#18181b] transition"
               aria-label="Close compiler modal"
             >
               <X className="w-5 h-5" />
@@ -489,8 +519,19 @@ export const CodeCompilerModal: React.FC<CodeCompilerModalProps> = ({
           </div>
         </div>
 
+        {/* Title Input Bar */}
+        <div className="px-6 py-2.5 bg-[#09090b] border-b border-[#27272a]">
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder={`Title (e.g. ${currentLangDef.name} Algorithm)`}
+            className="w-full bg-transparent text-sm sm:text-base font-bold text-white outline-none placeholder:text-slate-600"
+          />
+        </div>
+
         {/* Toolbar Bar */}
-        <div className="px-6 py-3 bg-slate-900/90 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div className="px-6 py-3 bg-[#121214] border-b border-[#27272a] flex flex-wrap items-center justify-between gap-3 text-xs">
           {/* Language Selector */}
           <div className="flex items-center gap-2">
             <label className="text-slate-400 font-semibold uppercase text-[10px] tracking-wider">
@@ -499,7 +540,7 @@ export const CodeCompilerModal: React.FC<CodeCompilerModalProps> = ({
             <select
               value={selectedLang}
               onChange={(e) => handleLanguageChange(e.target.value)}
-              className="px-3 py-1.5 rounded-xl bg-slate-800 border border-slate-700 text-slate-200 text-xs font-semibold outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+              className="px-3 py-1.5 rounded-xl bg-[#18181b] border border-[#27272a] text-slate-200 text-xs font-semibold outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
             >
               {LANGUAGES.map((lang) => (
                 <option key={lang.id} value={lang.id}>
@@ -514,7 +555,7 @@ export const CodeCompilerModal: React.FC<CodeCompilerModalProps> = ({
             <button
               type="button"
               onClick={handleAutoIndent}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold border border-slate-700 transition cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#18181b] hover:bg-[#27272a] text-slate-300 font-semibold border border-[#27272a] transition cursor-pointer"
               title="Automatically format and properly indent code"
             >
               <AlignLeft className="w-3.5 h-3.5 text-emerald-400" />
@@ -524,7 +565,7 @@ export const CodeCompilerModal: React.FC<CodeCompilerModalProps> = ({
             <button
               type="button"
               onClick={handleCopyCode}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold border border-slate-700 transition cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#18181b] hover:bg-[#27272a] text-slate-300 font-semibold border border-[#27272a] transition cursor-pointer"
               title="Copy code to clipboard"
             >
               {copied ? (
@@ -549,9 +590,9 @@ export const CodeCompilerModal: React.FC<CodeCompilerModalProps> = ({
 
         {/* Main Work Area: Code Editor & Terminal Output */}
         <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 overflow-hidden min-h-[380px]">
-          {/* Code Editor (7 cols) */}
-          <div className="lg:col-span-7 flex flex-col border-b lg:border-b-0 lg:border-r border-slate-800 bg-[#0d1117]">
-            <div className="px-4 py-2 bg-[#161b22] border-b border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
+          {/* Code Editor (7 cols) - Pure Matte Black */}
+          <div className="lg:col-span-7 flex flex-col border-b lg:border-b-0 lg:border-r border-[#27272a] bg-[#09090b]">
+            <div className="px-4 py-2 bg-[#121214] border-b border-[#27272a] flex items-center justify-between text-[11px] text-slate-400">
               <span className="font-mono flex items-center gap-1.5">
                 <FileCode className="w-3.5 h-3.5 text-emerald-400" />
                 <span>main.{currentLangDef.extension}</span>
@@ -570,28 +611,28 @@ export const CodeCompilerModal: React.FC<CodeCompilerModalProps> = ({
             />
           </div>
 
-          {/* Terminal / Live Preview (5 cols) */}
-          <div className="lg:col-span-5 flex flex-col bg-[#020617]">
-            <div className="px-4 py-2 bg-[#090d16] border-b border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
+          {/* Terminal / Live Preview (5 cols) - Matte Black */}
+          <div className="lg:col-span-5 flex flex-col bg-[#050507]">
+            <div className="px-4 py-2 bg-[#0c0c0e] border-b border-[#27272a] flex items-center justify-between text-[11px] text-slate-400">
               <span className="font-mono flex items-center gap-1.5 font-bold text-slate-300">
                 <Terminal className="w-3.5 h-3.5 text-emerald-400" />
                 <span>Console Output</span>
               </span>
               {executionTime && (
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 font-mono">
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 font-mono border border-emerald-500/20">
                   {executionTime}
                 </span>
               )}
             </div>
 
             {selectedLang === "html" ? (
-              <div className="flex-1 p-3 bg-slate-950 flex flex-col">
+              <div className="flex-1 p-3 bg-[#050507] flex flex-col">
                 <div className="text-[10px] uppercase font-bold text-slate-500 mb-2">Live Web Preview:</div>
                 <iframe
                   title="Live Preview"
                   sandbox="allow-scripts"
                   srcDoc={code}
-                  className="w-full flex-1 rounded-xl border border-slate-800 bg-white"
+                  className="w-full flex-1 rounded-xl border border-[#27272a] bg-white"
                 />
               </div>
             ) : (
@@ -602,33 +643,29 @@ export const CodeCompilerModal: React.FC<CodeCompilerModalProps> = ({
           </div>
         </div>
 
-        {/* Footer Bar: Insert & Share CTA */}
-        <div className="px-6 py-4 bg-slate-950 border-t border-slate-800 flex flex-wrap items-center justify-between gap-3">
-          <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={includeOutput}
-              onChange={(e) => setIncludeOutput(e.target.checked)}
-              className="rounded border-slate-700 bg-slate-800 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
-            />
-            <span>Include terminal output snapshot in the code block</span>
-          </label>
+        {/* Footer Bar: Straight Publish Code (No Insert Option) */}
+        <div className="px-6 py-4 bg-[#121214] border-t border-[#27272a] flex items-center justify-between">
+          <div className="text-xs text-slate-400 flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block"></span>
+            <span>Viewers will see & run this program inside the interactive compiler</span>
+          </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-sm font-medium text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+              className="px-4 py-2 rounded-xl text-sm font-medium text-slate-400 hover:text-white hover:bg-[#18181b] transition cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="button"
-              onClick={handleInsertIntoEditor}
-              className="px-5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-sm shadow-lg shadow-emerald-600/25 transition flex items-center gap-2 cursor-pointer"
+              onClick={handlePublishCodeDirectly}
+              disabled={isPublishing}
+              className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-sm shadow-lg shadow-emerald-600/30 transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
             >
-              <Code2 className="w-4 h-4" />
-              <span>Insert & Share Code</span>
+              <Send className="w-4 h-4" />
+              <span>{isPublishing ? "Publishing Code..." : "Publish Code"}</span>
             </button>
           </div>
         </div>

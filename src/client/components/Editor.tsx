@@ -38,12 +38,14 @@ interface EditorProps {
   initialTitle?: string;
   initialContent?: string;
   onPublishClick: (title: string, content: string) => void;
+  onPublishSuccess?: (slug: string) => void;
 }
 
 export const Editor: React.FC<EditorProps> = ({
   initialTitle = "",
   initialContent = "",
   onPublishClick,
+  onPublishSuccess,
 }) => {
   const [title, setTitle] = useState(initialTitle);
   const [wordCount, setWordCount] = useState(0);
@@ -766,9 +768,12 @@ export const Editor: React.FC<EditorProps> = ({
       <CodeCompilerModal
         isOpen={showCodeModal}
         onClose={() => setShowCodeModal(false)}
-        onInsertCode={(codeHtml) => {
-          exec("insertHTML", codeHtml);
-          updateStats();
+        onPublishSuccess={(slug) => {
+          if (onPublishSuccess) {
+            onPublishSuccess(slug);
+          } else {
+            window.location.href = `/p/${slug}`;
+          }
         }}
       />
     </div>
