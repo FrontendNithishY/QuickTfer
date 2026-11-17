@@ -92,7 +92,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         </div>
 
         <h3 className="text-xl font-extrabold text-gray-900 dark:text-white mb-1">
-          {mode === "login" ? "Welcome Back" : "Create QuickTrfr Account"}
+          {mode === "login" ? "Welcome Back" : "Create SharePaste Account"}
         </h3>
         <p className="text-xs text-gray-500 dark:text-gray-400 mb-6">
           {mode === "login"

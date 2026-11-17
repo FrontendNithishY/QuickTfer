@@ -116,11 +116,11 @@ export const BurnAfterReadingPage: React.FC<LandingPageProps> = ({ onStartAction
     },
     {
       question: "Can I combine burn-after-reading with a password?",
-      answer: "Yes! QuickTrfr allows you to enable both 'Burn After Reading' and password protection. The recipient must enter the password to view and burn the note."
+      answer: "Yes! SharePaste allows you to enable both 'Burn After Reading' and password protection. The recipient must enter the password to view and burn the note."
     },
     {
       question: "Are burn-after-reading notes logged or tracked?",
-      answer: "QuickTrfr operates with zero tracking logs. We do not track reader IP addresses, store browser fingerprints, or retain deleted records."
+      answer: "SharePaste operates with zero tracking logs. We do not track reader IP addresses, store browser fingerprints, or retain deleted records."
     },
     {
       question: "What happens if a burn-after-reading note is never opened?",
@@ -130,7 +130,7 @@ export const BurnAfterReadingPage: React.FC<LandingPageProps> = ({ onStartAction
 
   useEffect(() => {
     updateSEO({
-      title: "Burn After Reading Notes — One-Time Secret Links | QuickTrfr",
+      title: "Burn After Reading Notes — One-Time Secret Links | SharePaste",
       description: "Send self-destructing text messages, passwords, and API credentials with zero server residue. Permanent automatic deletion immediately upon first read.",
       canonicalPath: "/burn-after-reading",
       breadcrumbs,
@@ -166,14 +166,14 @@ export const BurnAfterReadingPage: React.FC<LandingPageProps> = ({ onStartAction
       {/* Technical Comparison Table */}
       <section className="mb-14">
         <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4 text-center">
-          Security Comparison: QuickTrfr vs. Traditional Communication
+          Security Comparison: SharePaste vs. Traditional Communication
         </h2>
         <div className="overflow-x-auto rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
           <table className="w-full text-xs text-left text-slate-600 dark:text-slate-300">
             <thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-900 dark:text-white uppercase font-bold border-b border-slate-200 dark:border-slate-800">
               <tr>
                 <th className="px-5 py-3.5">Security Feature</th>
-                <th className="px-5 py-3.5 text-blue-600 dark:text-blue-400">QuickTrfr Burn Note</th>
+                <th className="px-5 py-3.5 text-blue-600 dark:text-blue-400">SharePaste Burn Note</th>
                 <th className="px-5 py-3.5">Standard Email</th>
                 <th className="px-5 py-3.5">Chat Apps</th>
               </tr>
@@ -270,12 +270,12 @@ export const EncryptedPastePage: React.FC<LandingPageProps> = ({ onStartAction, 
       answer: "Zero-Knowledge means that only you and your intended recipients hold the cryptographic keys to decrypt the content. The server never sees your plaintext password and cannot view the decrypted data."
     },
     {
-      question: "Which cryptographic algorithm does QuickTrfr use?",
-      answer: "QuickTrfr uses authenticated AES-256-GCM (Galois/Counter Mode) with 100,000 rounds of PBKDF2 key derivation and a unique 16-byte cryptographically secure random salt per document."
+      question: "Which cryptographic algorithm does SharePaste use?",
+      answer: "SharePaste uses authenticated AES-256-GCM (Galois/Counter Mode) with 100,000 rounds of PBKDF2 key derivation and a unique 16-byte cryptographically secure random salt per document."
     },
     {
-      question: "Can QuickTrfr administrators decrypt my notes?",
-      answer: "No. Because the cryptographic key derivation and cipher authentication are computed with your custom passphrase, nobody—including QuickTrfr engineers—can decrypt your note without your password."
+      question: "Can SharePaste administrators decrypt my notes?",
+      answer: "No. Because the cryptographic key derivation and cipher authentication are computed with your custom passphrase, nobody—including SharePaste engineers—can decrypt your note without your password."
     },
     {
       question: "What happens if I forget my password?",
@@ -289,7 +289,7 @@ export const EncryptedPastePage: React.FC<LandingPageProps> = ({ onStartAction, 
 
   useEffect(() => {
     updateSEO({
-      title: "Zero-Knowledge Encrypted Pastebin — Client-Side AES-256-GCM | QuickTrfr",
+      title: "Zero-Knowledge Encrypted Pastebin — Client-Side AES-256-GCM | SharePaste",
       description: "Free, zero-knowledge encrypted pastebin. Protect confidential code and text with client-side AES-256-GCM encryption and PBKDF2 key derivation.",
       canonicalPath: "/encrypted-paste",
       breadcrumbs,
@@ -399,7 +399,7 @@ export const QuickCodePage: React.FC<LandingPageProps> = ({ onStartAction, onOpe
   const faqs: FAQItem[] = [
     {
       question: "How does the 6-digit PIN transfer work?",
-      answer: "When you publish or share a note with Quick Share, QuickTrfr generates a temporary 6-digit access code (e.g. 592 108) and a scannable QR code. On your other device, simply enter the 6 digits or scan the QR code to open the note immediately."
+      answer: "When you publish or share a note with Quick Share, SharePaste generates a temporary 6-digit access code (e.g. 592 108) and a scannable QR code. On your other device, simply enter the 6 digits or scan the QR code to open the note immediately."
     },
     {
       question: "Why does the pairing code last for 60 minutes?",
@@ -407,21 +407,21 @@ export const QuickCodePage: React.FC<LandingPageProps> = ({ onStartAction, onOpe
     },
     {
       question: "Do I need Bluetooth, cables, or an account?",
-      answer: "None! QuickTrfr PIN transfer is 100% web-based. It functions across Mac, Windows, Linux, iOS, Android, and Chromebooks without app downloads or sign-ups."
+      answer: "None! SharePaste PIN transfer is 100% web-based. It functions across Mac, Windows, Linux, iOS, Android, and Chromebooks without app downloads or sign-ups."
     },
     {
       question: "Can I transfer images, tables, or formatted text?",
-      answer: "Yes! QuickTrfr supports rich formatting, WYSIWYG headings, tables, embedded images, code snippets, and LaTeX equations."
+      answer: "Yes! SharePaste supports rich formatting, WYSIWYG headings, tables, embedded images, code snippets, and LaTeX equations."
     },
     {
       question: "Is Quick Code transfer free?",
-      answer: "Yes, QuickTrfr 60-minute quick codes and QR transfers are 100% free and open for public utility."
+      answer: "Yes, SharePaste 60-minute quick codes and QR transfers are 100% free and open for public utility."
     }
   ];
 
   useEffect(() => {
     updateSEO({
-      title: "Cross-Device PIN Transfer — Share Text with 6-Digit Code & QR | QuickTrfr",
+      title: "Cross-Device PIN Transfer — Share Text with 6-Digit Code & QR | SharePaste",
       description: "Transfer text, links, and code between PC and mobile phone instantly with a temporary 6-digit PIN and QR code. Zero setup, 60-minute auto-expiry.",
       canonicalPath: "/quick-code",
       breadcrumbs,
@@ -540,16 +540,16 @@ export const MathNotesPage: React.FC<LandingPageProps> = ({ onStartAction, onNav
 
   const faqs: FAQItem[] = [
     {
-      question: "How do I format math formulas in QuickTrfr?",
-      answer: "QuickTrfr supports standard LaTeX math delimiters. Wrap inline equations with single dollar signs like $E = mc^2$ or display formulas with double dollar signs like $$\\int f(x) dx$$."
+      question: "How do I format math formulas in SharePaste?",
+      answer: "SharePaste supports standard LaTeX math delimiters. Wrap inline equations with single dollar signs like $E = mc^2$ or display formulas with double dollar signs like $$\\int f(x) dx$$."
     },
     {
       question: "Can I export math notes to PDF?",
-      answer: "Yes! QuickTrfr includes an export-to-PDF button optimized for printing with high-resolution vector equation rendering."
+      answer: "Yes! SharePaste includes an export-to-PDF button optimized for printing with high-resolution vector equation rendering."
     },
     {
       question: "Which LaTeX commands are supported?",
-      answer: "QuickTrfr runs KaTeX, supporting virtually all standard AMS-LaTeX commands, matrices, calculus integrals, summation symbols, fractions, and Greek alphabets."
+      answer: "SharePaste runs KaTeX, supporting virtually all standard AMS-LaTeX commands, matrices, calculus integrals, summation symbols, fractions, and Greek alphabets."
     },
     {
       question: "Can I mix rich text, images, and math?",
@@ -557,13 +557,13 @@ export const MathNotesPage: React.FC<LandingPageProps> = ({ onStartAction, onNav
     },
     {
       question: "Can I password-protect academic papers or exam questions?",
-      answer: "Yes. QuickTrfr supports AES-256-GCM encryption on any math note to prevent unauthorized viewing."
+      answer: "Yes. SharePaste supports AES-256-GCM encryption on any math note to prevent unauthorized viewing."
     }
   ];
 
   useEffect(() => {
     updateSEO({
-      title: "LaTeX & KaTeX Math Formula Sharing — STEM Markdown Pastebin | QuickTrfr",
+      title: "LaTeX & KaTeX Math Formula Sharing — STEM Markdown Pastebin | SharePaste",
       description: "Publish and share complex mathematical formulas, calculus equations, matrices, and LaTeX proofs with live KaTeX rendering and instant PDF export.",
       canonicalPath: "/math-notes",
       breadcrumbs,

@@ -127,8 +127,8 @@ export const App: React.FC = () => {
       } else if (path === "/" || path === "") {
         setView("editor");
         updateSEO({
-          title: "QuickTrfr - Fast Paste, Transfer & 60-Minute Quick Sharing",
-          description: "QuickTrfr is an independent, fast and secure text publishing and transfer platform. Create rich notes, encrypt with AES-256-GCM, and share instantly anywhere using 60-minute quick codes and QR codes.",
+          title: "SharePaste - Fast Paste, Transfer & 60-Minute Quick Sharing",
+          description: "SharePaste is an independent, fast and secure text publishing and transfer platform. Create rich notes, encrypt with AES-256-GCM, and share instantly anywhere using 60-minute quick codes and QR codes.",
           canonicalPath: "/"
         });
       } else {
@@ -148,8 +148,8 @@ export const App: React.FC = () => {
 
     if (newView === "editor") {
       updateSEO({
-        title: "QuickTrfr - Fast Paste, Transfer & 60-Minute Quick Sharing",
-        description: "QuickTrfr is an independent, fast and secure text publishing and transfer platform. Create rich notes, encrypt with AES-256-GCM, and share instantly anywhere using 60-minute quick codes and QR codes.",
+        title: "SharePaste - Fast Paste, Transfer & 60-Minute Quick Sharing",
+        description: "SharePaste is an independent, fast and secure text publishing and transfer platform. Create rich notes, encrypt with AES-256-GCM, and share instantly anywhere using 60-minute quick codes and QR codes.",
         canonicalPath: "/"
       });
     }
@@ -359,11 +359,11 @@ export const App: React.FC = () => {
             <div className="flex flex-col items-center md:items-start gap-1">
               <div className="flex items-center gap-1.5 font-bold text-gray-800 dark:text-gray-200">
                 <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                <span>Quick<span className="text-blue-600">Trfr</span></span>
+                <span>Share<span className="text-blue-600">Paste</span></span>
                 <span className="font-normal text-gray-400">· Independent Text Publishing & Fast Transfer</span>
               </div>
               <p className="text-[11px] text-gray-400 dark:text-gray-500">
-                © {new Date().getFullYear()} QuickTrfr. All rights reserved. Zero-logging temporary sharing & AES-256-GCM encryption.
+                © {new Date().getFullYear()} SharePaste. All rights reserved. Zero-logging temporary sharing & AES-256-GCM encryption.
               </p>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-5 font-medium">

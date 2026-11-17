@@ -8,7 +8,15 @@ if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
 
-const dbPath = path.join(dataDir, "quicktrfr.sqlite");
+const dbPath = path.join(dataDir, "sharepaste.sqlite");
+const legacyDbPath = path.join(dataDir, "quicktrfr.sqlite");
+if (!fs.existsSync(dbPath) && fs.existsSync(legacyDbPath)) {
+  try {
+    fs.copyFileSync(legacyDbPath, dbPath);
+  } catch (err) {
+    console.warn("[Database] Notice during legacy migration:", err);
+  }
+}
 export const db = new DatabaseSync(dbPath);
 
 // Enable WAL mode & foreign keys for high performance and integrity

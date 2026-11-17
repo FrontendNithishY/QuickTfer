@@ -67,7 +67,7 @@ export const QuickShareModal: React.FC<QuickShareModalProps> = ({
   const downloadQR = () => {
     const link = document.createElement("a");
     link.href = data.qrCodeDataUrl;
-    link.download = `quicktrfr-qr-${data.code}.png`;
+    link.download = `sharepaste-qr-${data.code}.png`;
     link.click();
   };
 

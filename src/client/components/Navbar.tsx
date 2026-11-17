@@ -48,7 +48,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             e.preventDefault();
             onNavigateHome();
           }}
-          aria-label="QuickTrfr Home - Fast Paste and Transfer Anywhere"
+          aria-label="SharePaste Home - Fast Paste and Transfer Anywhere"
           className="flex items-center gap-2 cursor-pointer group"
         >
           <div className="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center text-white shadow-sm group-hover:bg-blue-700 transition">
@@ -57,7 +57,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div className="flex flex-col">
             <div className="flex items-center">
               <span className="font-extrabold text-xl tracking-tight text-slate-900 dark:text-white">
-                Quick<span className="text-blue-600">Trfr</span>
+                Share<span className="text-blue-600">Paste</span>
               </span>
             </div>
             <span className="text-[10px] text-gray-500 dark:text-gray-400 font-medium -mt-1 hidden sm:block">
@@ -162,7 +162,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               type="button"
               onClick={onOpenAuth}
-              aria-label="Sign in to QuickTrfr account"
+              aria-label="Sign in to SharePaste account"
               className="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm shadow-xs transition"
             >
               Sign In

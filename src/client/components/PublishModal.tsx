@@ -109,7 +109,7 @@ export const PublishModal: React.FC<PublishModalProps> = ({
               Custom URL (Optional)
             </label>
             <div className="flex items-center rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/80 px-3 py-2 text-sm focus-within:border-blue-600 focus-within:ring-1 focus-within:ring-blue-600">
-              <span className="text-gray-400 font-mono text-xs select-none">quicktrfr/</span>
+              <span className="text-gray-400 font-mono text-xs select-none">sharepaste/</span>
               <input
                 type="text"
                 value={customSlug}

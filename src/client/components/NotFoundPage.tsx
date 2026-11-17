@@ -15,7 +15,7 @@ export const NotFoundPage: React.FC<NotFoundProps> = ({
 }) => {
   useEffect(() => {
     updateSEO({
-      title: "404 - Note or Page Not Found | QuickTrfr",
+      title: "404 - Note or Page Not Found | SharePaste",
       description: "The note or page you are looking for does not exist, has expired, or was permanently burned after reading.",
       canonicalPath: "/404"
     });
@@ -59,7 +59,7 @@ export const NotFoundPage: React.FC<NotFoundProps> = ({
 
       {/* Quick Discovery Links */}
       <div className="w-full pt-8 border-t border-slate-200 dark:border-slate-800/80">
-        <p className="text-xs font-semibold text-slate-500 mb-4">Or explore QuickTrfr tools:</p>
+        <p className="text-xs font-semibold text-slate-500 mb-4">Or explore SharePaste tools:</p>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
           <a
             href="/burn-after-reading"

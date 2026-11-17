@@ -48,7 +48,7 @@ Allow: /encrypted-paste
 Allow: /quick-code
 Allow: /math-notes
 
-Sitemap: https://quicktrfr.vercel.app/sitemap.xml
+Sitemap: https://sharepaste-app.vercel.app/sitemap.xml
 `);
 });
 
@@ -57,31 +57,31 @@ app.get("/sitemap.xml", (_req, res) => {
   res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://quicktrfr.vercel.app/</loc>
+    <loc>https://sharepaste-app.vercel.app/</loc>
     <lastmod>2026-11-17</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://quicktrfr.vercel.app/burn-after-reading</loc>
+    <loc>https://sharepaste-app.vercel.app/burn-after-reading</loc>
     <lastmod>2026-11-17</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://quicktrfr.vercel.app/encrypted-paste</loc>
+    <loc>https://sharepaste-app.vercel.app/encrypted-paste</loc>
     <lastmod>2026-11-17</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://quicktrfr.vercel.app/quick-code</loc>
+    <loc>https://sharepaste-app.vercel.app/quick-code</loc>
     <lastmod>2026-11-17</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://quicktrfr.vercel.app/math-notes</loc>
+    <loc>https://sharepaste-app.vercel.app/math-notes</loc>
     <lastmod>2026-11-17</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
@@ -105,7 +105,7 @@ app.get("/raw/:slug", (req, res, next) => {
 app.get("/api/health", (_req, res) => {
   res.json({
     status: "ok",
-    app: "QuickTrfr",
+    app: "SharePaste",
     version: "1.0.0",
     uptime: process.uptime(),
     timestamp: Date.now(),

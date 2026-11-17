@@ -25,6 +25,6 @@ if (fs.existsSync(clientDist)) {
 }
 
 app.listen(PORT, () => {
-  console.log(`[QuickTrfr Server] Running at http://localhost:${PORT}`);
-  console.log(`[QuickTrfr Server] Client directory checked: ${clientDist}`);
+  console.log(`[SharePaste Server] Running at http://localhost:${PORT}`);
+  console.log(`[SharePaste Server] Client directory checked: ${clientDist}`);
 });

@@ -35,7 +35,7 @@ export function updateSEO({
   }
 
   // 3. Canonical URL
-  const fullUrl = `https://quicktrfr.vercel.app${canonicalPath}`;
+  const fullUrl = `https://sharepaste-app.vercel.app${canonicalPath}`;
   let canonical = document.querySelector('link[rel="canonical"]');
   if (canonical) {
     canonical.setAttribute("href", fullUrl);
@@ -76,8 +76,8 @@ export function updateSEO({
     "inLanguage": "en-US",
     "isPartOf": {
       "@type": "WebSite",
-      "name": "QuickTrfr",
-      "url": "https://quicktrfr.vercel.app"
+      "name": "SharePaste",
+      "url": "https://sharepaste-app.vercel.app"
     }
   });
 
@@ -90,7 +90,7 @@ export function updateSEO({
         "@type": "ListItem",
         "position": idx + 1,
         "name": crumb.name,
-        "item": crumb.url.startsWith("http") ? crumb.url : `https://quicktrfr.vercel.app${crumb.url}`
+        "item": crumb.url.startsWith("http") ? crumb.url : `https://sharepaste-app.vercel.app${crumb.url}`
       }))
     });
   }

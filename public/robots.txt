@@ -6,4 +6,4 @@ Allow: /
 Disallow: /p/
 Disallow: /paste/
 
-Sitemap: https://quicktrfr.vercel.app/sitemap.xml
+Sitemap: https://sharepaste-app.vercel.app/sitemap.xml
