@@ -1,10 +1,11 @@
-﻿import { Router } from "express";
+import { Router } from "express";
 import multer from "multer";
 import path from "node:path";
 import fs from "node:fs";
 
 const router = Router();
-const uploadsDir = path.resolve(process.cwd(), "uploads");
+const isVercel = Boolean(process.env.VERCEL || process.env.NOW_REGION);
+const uploadsDir = isVercel ? path.join("/tmp", "uploads") : path.resolve(process.cwd(), "uploads");
 
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });

@@ -3,6 +3,8 @@ node_modules/
 
 # Production build
 dist/
+dist-server/
+.vercel/
 
 # SQLite Database & Storage
 data/*.sqlite*

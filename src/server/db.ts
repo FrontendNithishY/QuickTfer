@@ -1,8 +1,9 @@
-﻿import { DatabaseSync } from "node:sqlite";
+import { DatabaseSync } from "node:sqlite";
 import path from "node:path";
 import fs from "node:fs";
 
-const dataDir = path.resolve(process.cwd(), "data");
+const isVercel = Boolean(process.env.VERCEL || process.env.NOW_REGION);
+const dataDir = isVercel ? path.join("/tmp", "data") : path.resolve(process.cwd(), "data");
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
@@ -11,10 +12,14 @@ const dbPath = path.join(dataDir, "justpaste.sqlite");
 export const db = new DatabaseSync(dbPath);
 
 // Enable WAL mode & foreign keys for high performance and integrity
-db.exec(`
-  PRAGMA journal_mode = WAL;
-  PRAGMA foreign_keys = ON;
-`);
+try {
+  db.exec(`
+    PRAGMA journal_mode = WAL;
+    PRAGMA foreign_keys = ON;
+  `);
+} catch (e) {
+  console.warn("[Database] PRAGMA notice:", e);
+}
 
 export function initDatabase() {
   db.exec(`

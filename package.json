@@ -2,8 +2,11 @@
   "name": "quicktfer",
   "version": "1.0.0",
   "description": "QuickTfer - Paste, Transfer & Share with 60-Minute Quick Code & QR",
-  "main": "dist/server/index.js",
+  "main": "dist-server/index.js",
   "type": "module",
+  "engines": {
+    "node": ">=22.x"
+  },
   "scripts": {
     "dev:server": "tsx watch src/server/index.ts",
     "dev:client": "vite",
@@ -11,7 +14,7 @@
     "build:client": "vite build",
     "build:server": "tsc -p tsconfig.server.json",
     "build": "npm run build:client && npm run build:server",
-    "start": "node dist/server/index.js",
+    "start": "node dist-server/index.js",
     "test": "tsx tests/test-suite.ts"
   },
   "dependencies": {
