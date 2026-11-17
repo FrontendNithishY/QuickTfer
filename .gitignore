@@ -1,0 +1,20 @@
+﻿# Dependencies
+node_modules/
+
+# Production build
+dist/
+
+# SQLite Database & Storage
+data/*.sqlite*
+!data/.gitkeep
+
+# Uploaded User Media
+uploads/*
+!uploads/.gitkeep
+
+# Environment & Logs
+.env
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db

@@ -1,0 +1,51 @@
+{
+  "name": "quicktfer",
+  "version": "1.0.0",
+  "description": "QuickTfer - Paste, Transfer & Share with 60-Minute Quick Code & QR",
+  "main": "dist/server/index.js",
+  "type": "module",
+  "scripts": {
+    "dev:server": "tsx watch src/server/index.ts",
+    "dev:client": "vite",
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "build:client": "vite build",
+    "build:server": "tsc -p tsconfig.server.json",
+    "build": "npm run build:client && npm run build:server",
+    "start": "node dist/server/index.js",
+    "test": "tsx tests/test-suite.ts"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "katex": "^0.16.21",
+    "lucide-react": "^1.16.0",
+    "multer": "^1.4.5-lts.1",
+    "nanoid": "^5.1.0",
+    "qrcode": "^1.5.4",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.9",
+    "@types/katex": "^0.16.7",
+    "@types/multer": "^1.4.12",
+    "@types/node": "^22.13.4",
+    "@types/qrcode": "^1.5.5",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.20",
+    "concurrently": "^9.1.2",
+    "postcss": "^8.5.2",
+    "tailwindcss": "^3.4.17",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "vite": "^6.1.0"
+  }
+}
