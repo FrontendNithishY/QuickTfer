@@ -183,7 +183,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         {p.title || "Untitled"}
                       </div>
                       <div className="text-xs font-mono text-blue-600 dark:text-blue-400">
-                        quicktfer/{p.slug}
+                        quicktrfr/{p.slug}
                       </div>
                     </td>
 

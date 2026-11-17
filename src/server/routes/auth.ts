@@ -1,10 +1,10 @@
-﻿import { Router } from "express";
+import { Router } from "express";
 import jwt from "jsonwebtoken";
 import { db } from "../db.js";
 import { hashPassword, comparePassword } from "../crypto.js";
 
 const router = Router();
-export const JWT_SECRET = process.env.JWT_SECRET || "justpaste-secret-key-production-grade";
+export const JWT_SECRET = process.env.JWT_SECRET || "quicktrfr-secret-key-production-grade";
 
 export interface AuthUser {
   id: number;

@@ -1,4 +1,4 @@
-﻿import express from "express";
+import express from "express";
 import cors from "cors";
 import path from "node:path";
 import fs from "node:fs";
@@ -40,7 +40,7 @@ app.get("/raw/:slug", (req, res, next) => {
 app.get("/api/health", (_req, res) => {
   res.json({
     status: "ok",
-    app: "QuickTfer",
+    app: "QuickTrfr",
     version: "1.0.0",
     uptime: process.uptime(),
     timestamp: Date.now(),

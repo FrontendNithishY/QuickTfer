@@ -113,7 +113,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                     {p.title || "Untitled"}
                   </h4>
                   <span className="text-xs font-mono text-blue-600 dark:text-blue-400">
-                    quicktfer/{p.slug}
+                    quicktrfr/{p.slug}
                   </span>
                 </div>
                 <div className="flex items-center gap-4 text-xs text-gray-500">

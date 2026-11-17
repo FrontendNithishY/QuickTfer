@@ -1,6 +1,8 @@
-﻿# QuickTfer ⚡
+# QuickTrfr ⚡
 
-> **Fast Paste & Transfer Anywhere** — A production-grade, 100% working full-stack replica of [JustPaste.it](https://justpaste.it/) equipped with rich text WYSIWYG editing, document & media embeds, AES-256-GCM password encryption, flexible expiration, custom short URLs, user accounts, and an exclusive **60-Minute Quick Code & QR Sharing** engine.
+> **Fast Paste & Transfer Anywhere** — A production-grade, modern content publishing, sharing, and transfer platform equipped with rich text WYSIWYG editing, document & media embeds, AES-256-GCM password encryption, flexible expiration, custom short URLs, user accounts, and an exclusive **60-Minute Quick Code & QR Sharing** engine.
+
+Live Website: **[https://quicktrfr.vercel.app](https://quicktrfr.vercel.app)**
 
 ---
 
@@ -24,7 +26,7 @@
 - **Flexible Expiration**: Never, 10 Minutes, 1 Hour, 1 Day, 1 Week, 1 Month, or custom date/time.
 - **Burn After Reading**: Option to automatically self-destruct the note permanently after a single read.
 - **Visibility**: Public (searchable), Unlisted (link-only), or Private (account-only).
-- **Custom URLs**: Choose custom vanity slugs (e.g. `quicktfer/my-custom-note`) or use clean auto-generated slugs.
+- **Custom URLs**: Choose custom vanity slugs (e.g. `quicktrfr/my-custom-note`) or use clean auto-generated slugs.
 - **View Counter & Comments Toggle**: Configure whether view counts and reader discussions are enabled.
 
 ### 4. 🚀 Reading & Export Experience

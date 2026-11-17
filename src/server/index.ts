@@ -1,4 +1,4 @@
-﻿import express from "express";
+import express from "express";
 import app from "./app.js";
 import path from "node:path";
 import fs from "node:fs";
@@ -18,6 +18,6 @@ if (fs.existsSync(clientDist)) {
 }
 
 app.listen(PORT, () => {
-  console.log(`[QuickTfer Server] Running at http://localhost:${PORT}`);
-  console.log(`[QuickTfer Server] Client directory checked: ${clientDist}`);
+  console.log(`[QuickTrfr Server] Running at http://localhost:${PORT}`);
+  console.log(`[QuickTrfr Server] Client directory checked: ${clientDist}`);
 });

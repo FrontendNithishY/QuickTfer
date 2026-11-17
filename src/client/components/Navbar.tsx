@@ -52,7 +52,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div className="flex flex-col">
             <div className="flex items-center">
               <span className="font-extrabold text-xl tracking-tight text-slate-900 dark:text-white">
-                Quick<span className="text-blue-600">Tfer</span>
+                Quick<span className="text-blue-600">Trfr</span>
               </span>
             </div>
             <span className="text-[10px] text-gray-500 dark:text-gray-400 font-medium -mt-1 hidden sm:block">

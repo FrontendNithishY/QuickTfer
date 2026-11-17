@@ -1,4 +1,4 @@
-﻿import assert from "node:assert";
+import assert from "node:assert";
 import http from "node:http";
 import { db } from "../src/server/db.js";
 import express from "express";
@@ -19,7 +19,7 @@ app.get("/raw/:slug", (req, res, next) => {
 });
 
 async function runTests() {
-  console.log("=== STARTING AUTOMATED TEST SUITE: JUSTPASTE.IT REPLICA ===");
+  console.log("=== STARTING AUTOMATED TEST SUITE: QUICKTRFR ===");
   const server = http.createServer(app);
   await new Promise<void>((resolve) => server.listen(3099, resolve));
   const baseUrl = "http://localhost:3099";
@@ -32,7 +32,7 @@ async function runTests() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         title: "Test Note 1",
-        content: "<p>Hello world from JustPaste replica!</p>",
+        content: "<p>Hello world from QuickTrfr!</p>",
         visibility: "public",
         tags: ["tech", "demo"]
       })
@@ -49,7 +49,7 @@ async function runTests() {
     assert.strictEqual(getRes.status, 200, "Expected 200 OK");
     const fetched1 = await getRes.json() as any;
     assert.strictEqual(fetched1.title, "Test Note 1");
-    assert.strictEqual(fetched1.content, "<p>Hello world from JustPaste replica!</p>");
+    assert.strictEqual(fetched1.content, "<p>Hello world from QuickTrfr!</p>");
     assert.strictEqual(fetched1.isEncrypted, false);
     assert.deepStrictEqual(fetched1.tags, ["tech", "demo"]);
     console.log("✓ Paste fetched and content verified.");
@@ -59,7 +59,7 @@ async function runTests() {
     const rawRes = await fetch(`${baseUrl}/raw/${paste1.slug}`);
     assert.strictEqual(rawRes.status, 200);
     const rawText = await rawRes.text();
-    assert.ok(rawText.includes("Hello world from JustPaste replica!"), "Raw text should contain text");
+    assert.ok(rawText.includes("Hello world from QuickTrfr!"), "Raw text should contain text");
     console.log("✓ Raw text endpoint verified.");
 
     // 4. Test 60-Minute Quick Share Code & QR
