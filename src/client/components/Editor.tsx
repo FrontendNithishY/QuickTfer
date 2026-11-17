@@ -28,9 +28,11 @@ import {
   Key,
   X,
   ExternalLink,
-  Check
+  Check,
+  Terminal
 } from "lucide-react";
 import katex from "katex";
+import { CodeCompilerModal } from "./CodeCompilerModal.js";
 
 interface EditorProps {
   initialTitle?: string;
@@ -57,6 +59,7 @@ export const Editor: React.FC<EditorProps> = ({
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
   const [apiKeyInput, setApiKeyInput] = useState(() => localStorage.getItem("sharepaste_gemini_key") || "");
   const [aiNotice, setAiNotice] = useState<string | null>(null);
+  const [showCodeModal, setShowCodeModal] = useState(false);
 
   const handleAiPolish = async () => {
     if (!editorRef.current) return;
@@ -576,6 +579,17 @@ export const Editor: React.FC<EditorProps> = ({
               </button>
             )}
 
+            {/* Code Highlighted Compiler & Formatter Button (Left of AI Polish) */}
+            <button
+              type="button"
+              onClick={() => setShowCodeModal(true)}
+              className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100/80 dark:hover:bg-emerald-900/60 border border-emerald-300 dark:border-emerald-800 rounded-lg shadow-sm transition cursor-pointer"
+              title="Code highlighted: Run, compile, auto-indent & share code"
+            >
+              <Terminal className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span>Code highlighted</span>
+            </button>
+
             <div className="inline-flex items-center rounded-lg border border-purple-200 dark:border-purple-800/80 bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-950/40 dark:to-indigo-950/40 shadow-sm overflow-hidden">
               <button
                 type="button"
@@ -747,6 +761,16 @@ export const Editor: React.FC<EditorProps> = ({
           </div>
         </div>
       )}
+
+      {/* Code Highlighted Compiler & Formatter Modal */}
+      <CodeCompilerModal
+        isOpen={showCodeModal}
+        onClose={() => setShowCodeModal(false)}
+        onInsertCode={(codeHtml) => {
+          exec("insertHTML", codeHtml);
+          updateStats();
+        }}
+      />
     </div>
   );
 };

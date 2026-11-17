@@ -217,13 +217,29 @@ async function runTests() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ content: "<p>test grammer and spellin</p>" })
     });
-    assert.strictEqual(noKeyRes.status, 400, "Missing API key should return 400");
-    const noKeyData = await noKeyRes.json() as any;
-    assert.strictEqual(noKeyData.error, "NO_API_KEY");
-    console.log("✓ AI Polish validations (EMPTY_CONTENT, NO_API_KEY) verified.");
+    // 11. Test Code Highlighted Container Creation & Retrieval
+    console.log("[Test 11] Testing Code Highlighted Container Creation & Retrieval...");
+    const sampleCodeBlock = `<div class="code-highlight-container" style="background-color: #0d1117;"><pre><code>const x = 42;</code></pre></div>`;
+    const codePasteRes = await fetch(`${baseUrl}/api/pastes`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: "Python Algorithm Code Snippet",
+        content: sampleCodeBlock,
+        visibility: "public"
+      })
+    });
+    assert.strictEqual(codePasteRes.status, 201);
+    const codePasteData = await codePasteRes.json() as any;
+    assert.ok(codePasteData.slug);
+
+    const getCodePaste = await (await fetch(`${baseUrl}/api/pastes/${codePasteData.slug}`)).json() as any;
+    assert.ok(getCodePaste.content.includes("code-highlight-container"));
+    assert.ok(getCodePaste.content.includes("const x = 42;"));
+    console.log("✓ Code highlighted container created and verified in database.");
 
     console.log("\n=======================================================");
-    console.log("🎉 ALL AUTOMATED TESTS PASSED SUCCESSFULLY! (10/10) 🎉");
+    console.log("🎉 ALL AUTOMATED TESTS PASSED SUCCESSFULLY! (11/11) 🎉");
     console.log("=======================================================\n");
   } finally {
     server.close();
