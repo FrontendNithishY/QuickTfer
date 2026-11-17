@@ -669,12 +669,12 @@ export const Editor: React.FC<EditorProps> = ({
               </div>
               <div>
                 <h3 className="text-xl font-bold text-gray-900 dark:text-white">AI Polish Setup</h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400">100% Free via Google Gemini 1.5 Flash</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">100% Free via Google Gemini 3.8 Flash</p>
               </div>
             </div>
 
             <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed mb-4">
-              SharePaste uses <strong>Google Gemini 1.5 Flash</strong> to rephrase awkward grammar, eliminate typos, and cleanly align your paragraphs into semantic blocks while preserving formulas and code.
+              SharePaste uses <strong>Google Gemini 3.8 Flash</strong> to rephrase awkward grammar, eliminate typos, and cleanly align your paragraphs into semantic blocks while preserving formulas and code.
             </p>
 
             <div className="bg-purple-50 dark:bg-purple-950/40 border border-purple-200/80 dark:border-purple-800/60 rounded-2xl p-4 mb-5 text-xs text-purple-900 dark:text-purple-200 space-y-2">

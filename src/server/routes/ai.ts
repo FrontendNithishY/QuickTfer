@@ -18,17 +18,30 @@ Your ONLY task is to polish the provided HTML/text content:
 5. Do NOT add any introductory, conversational, or concluding remarks (e.g. "Here is the revised text:", "I have fixed...").
 6. Output ONLY the raw HTML content suitable for insertion into contenteditable. Do NOT wrap the output in markdown code blocks like \`\`\`html or \`\`\`.`;
 
-// Candidate models and API versions to try in order
+// Active models to try in order of capability & availability
 const CANDIDATE_MODELS = [
+  { version: "v1beta", model: "gemini-3.8-flash" },
+  { version: "v1beta", model: "gemini-3.8-flash-latest" },
+  { version: "v1beta", model: "gemini-3.0-flash" },
+  { version: "v1beta", model: "gemini-2.5-flash" },
+  { version: "v1beta", model: "gemini-2.0-flash" },
   { version: "v1beta", model: "gemini-1.5-flash-latest" },
   { version: "v1beta", model: "gemini-1.5-flash" },
   { version: "v1", model: "gemini-1.5-flash" },
-  { version: "v1beta", model: "gemini-2.0-flash" },
-  { version: "v1beta", model: "gemini-2.0-flash-exp" },
   { version: "v1beta", model: "gemini-1.5-flash-8b" },
-  { version: "v1beta", model: "gemini-1.5-pro" },
-  { version: "v1", model: "gemini-pro" }
+  { version: "v1beta", model: "gemini-1.5-pro" }
 ];
+
+function isExplicitKeyAuthError(data: any): boolean {
+  const msg = (data?.error?.message || "").toLowerCase();
+  return (
+    msg.includes("api_key_invalid") ||
+    msg.includes("api key not valid") ||
+    msg.includes("invalid api key") ||
+    msg.includes("permission denied") ||
+    msg.includes("unauthenticated")
+  );
+}
 
 async function callGeminiGenerate(
   apiKey: string,
@@ -36,35 +49,41 @@ async function callGeminiGenerate(
   modelName: string,
   prompt: string
 ): Promise<{ ok: boolean; status: number; text?: string; data?: any }> {
-  // Normalize model name (remove "models/" prefix if present)
   const cleanModel = modelName.replace(/^models\//, "");
   const url = `https://generativelanguage.googleapis.com/${version}/models/${cleanModel}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [
-        {
-          role: "user",
-          parts: [{ text: prompt }]
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": apiKey
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: prompt }]
+          }
+        ],
+        generationConfig: {
+          temperature: 0.3,
+          maxOutputTokens: 8192
         }
-      ],
-      generationConfig: {
-        temperature: 0.3,
-        maxOutputTokens: 8192
-      }
-    })
-  });
+      })
+    });
 
-  const data = (await response.json()) as any;
+    const data = (await response.json()) as any;
 
-  if (response.ok) {
-    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    return { ok: true, status: response.status, text: rawText, data };
+    if (response.ok) {
+      const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      return { ok: true, status: response.status, text: rawText, data };
+    }
+
+    return { ok: false, status: response.status, data };
+  } catch (err: any) {
+    return { ok: false, status: 500, data: { error: { message: err.message } } };
   }
-
-  return { ok: false, status: response.status, data };
 }
 
 router.post("/ai/polish", async (req: Request, res: Response) => {
@@ -95,7 +114,7 @@ router.post("/ai/polish", async (req: Request, res: Response) => {
     let lastStatus = 500;
     let generatedText: string | undefined;
 
-    // 1. Try candidate models
+    // 1. Try candidate models in order (starting with gemini-3.8-flash)
     for (const candidate of CANDIDATE_MODELS) {
       const result = await callGeminiGenerate(apiKey, candidate.version, candidate.model, fullPrompt);
 
@@ -107,36 +126,60 @@ router.post("/ai/polish", async (req: Request, res: Response) => {
       lastError = result.data;
       lastStatus = result.status;
 
-      // If key is invalid (400 / API_KEY_INVALID), stop immediately
-      const errMsg = result.data?.error?.message || "";
-      if (result.status === 400 && (errMsg.includes("API_KEY") || errMsg.includes("key"))) {
+      // If the API key itself is definitively invalid, abort immediately
+      if (isExplicitKeyAuthError(result.data)) {
         break;
       }
 
-      // If 404 (model not found / not supported), proceed to try next model
+      // If Google explicitly suggests a model in the error message (e.g. "Please update your code to use models/gemini-3.8-flash"), try that model directly!
+      const errMsg = result.data?.error?.message || "";
+      const modelSuggestion = errMsg.match(/use models\/([a-zA-Z0-9.-]+)/i);
+      if (modelSuggestion && modelSuggestion[1]) {
+        const suggested = modelSuggestion[1];
+        const directTry = await callGeminiGenerate(apiKey, "v1beta", suggested, fullPrompt);
+        if (directTry.ok && directTry.text) {
+          generatedText = directTry.text;
+          break;
+        }
+      }
     }
 
-    // 2. If candidates all failed with 404, dynamically query ListModels to find available models
-    if (!generatedText && (lastStatus === 404 || lastError?.error?.message?.includes("not found"))) {
+    // 2. If candidate loop didn't generate text and the key isn't invalid, auto-discover enabled models via ListModels
+    if (!generatedText && !isExplicitKeyAuthError(lastError)) {
       try {
         const listRes = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`
+          `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`,
+          {
+            headers: { "x-goog-api-key": apiKey }
+          }
         );
+
         if (listRes.ok) {
           const listData = (await listRes.json()) as any;
           const models: any[] = listData.models || [];
-          
-          // Find first model supporting generateContent
-          const usable = models.find(
-            (m) =>
-              Array.isArray(m.supportedGenerationMethods) &&
-              m.supportedGenerationMethods.includes("generateContent")
-          );
 
-          if (usable && usable.name) {
+          // Sort models: prioritize flash / latest models supporting generateContent
+          const usableModels = models
+            .filter(
+              (m) =>
+                Array.isArray(m.supportedGenerationMethods) &&
+                m.supportedGenerationMethods.includes("generateContent")
+            )
+            .sort((a, b) => {
+              const aName = a.name || "";
+              const bName = b.name || "";
+              if (aName.includes("3.8") && !bName.includes("3.8")) return -1;
+              if (!aName.includes("3.8") && bName.includes("3.8")) return 1;
+              if (aName.includes("flash") && !bName.includes("flash")) return -1;
+              if (!aName.includes("flash") && bName.includes("flash")) return 1;
+              return 0;
+            });
+
+          for (const usable of usableModels.slice(0, 3)) {
             const dynamicResult = await callGeminiGenerate(apiKey, "v1beta", usable.name, fullPrompt);
             if (dynamicResult.ok && dynamicResult.text) {
               generatedText = dynamicResult.text;
+              break;
             } else {
               lastError = dynamicResult.data;
               lastStatus = dynamicResult.status;
@@ -150,7 +193,7 @@ router.post("/ai/polish", async (req: Request, res: Response) => {
 
     if (!generatedText) {
       const errMessage = lastError?.error?.message || "Failed to communicate with AI provider.";
-      const isKeyError = lastStatus === 400 && (errMessage.includes("API_KEY") || errMessage.includes("key"));
+      const isKeyError = isExplicitKeyAuthError(lastError);
 
       res.status(lastStatus >= 400 && lastStatus < 600 ? lastStatus : 502).json({
         error: isKeyError ? "INVALID_API_KEY" : "AI_PROVIDER_ERROR",
