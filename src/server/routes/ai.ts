@@ -18,6 +18,55 @@ Your ONLY task is to polish the provided HTML/text content:
 5. Do NOT add any introductory, conversational, or concluding remarks (e.g. "Here is the revised text:", "I have fixed...").
 6. Output ONLY the raw HTML content suitable for insertion into contenteditable. Do NOT wrap the output in markdown code blocks like \`\`\`html or \`\`\`.`;
 
+// Candidate models and API versions to try in order
+const CANDIDATE_MODELS = [
+  { version: "v1beta", model: "gemini-1.5-flash-latest" },
+  { version: "v1beta", model: "gemini-1.5-flash" },
+  { version: "v1", model: "gemini-1.5-flash" },
+  { version: "v1beta", model: "gemini-2.0-flash" },
+  { version: "v1beta", model: "gemini-2.0-flash-exp" },
+  { version: "v1beta", model: "gemini-1.5-flash-8b" },
+  { version: "v1beta", model: "gemini-1.5-pro" },
+  { version: "v1", model: "gemini-pro" }
+];
+
+async function callGeminiGenerate(
+  apiKey: string,
+  version: string,
+  modelName: string,
+  prompt: string
+): Promise<{ ok: boolean; status: number; text?: string; data?: any }> {
+  // Normalize model name (remove "models/" prefix if present)
+  const cleanModel = modelName.replace(/^models\//, "");
+  const url = `https://generativelanguage.googleapis.com/${version}/models/${cleanModel}:generateContent?key=${encodeURIComponent(apiKey)}`;
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [
+        {
+          role: "user",
+          parts: [{ text: prompt }]
+        }
+      ],
+      generationConfig: {
+        temperature: 0.3,
+        maxOutputTokens: 8192
+      }
+    })
+  });
+
+  const data = (await response.json()) as any;
+
+  if (response.ok) {
+    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    return { ok: true, status: response.status, text: rawText, data };
+  }
+
+  return { ok: false, status: response.status, data };
+}
+
 router.post("/ai/polish", async (req: Request, res: Response) => {
   try {
     const { content, apiKey: customKey } = req.body;
@@ -40,59 +89,78 @@ router.post("/ai/polish", async (req: Request, res: Response) => {
       return;
     }
 
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
+    const fullPrompt = `${SYSTEM_PROMPT}\n\n--- CONTENT TO POLISH ---\n${content}`;
 
-    const geminiPayload = {
-      contents: [
-        {
-          role: "user",
-          parts: [
-            {
-              text: `${SYSTEM_PROMPT}\n\n--- CONTENT TO POLISH ---\n${content}`
-            }
-          ]
-        }
-      ],
-      generationConfig: {
-        temperature: 0.3,
-        maxOutputTokens: 8192
+    let lastError: any = null;
+    let lastStatus = 500;
+    let generatedText: string | undefined;
+
+    // 1. Try candidate models
+    for (const candidate of CANDIDATE_MODELS) {
+      const result = await callGeminiGenerate(apiKey, candidate.version, candidate.model, fullPrompt);
+
+      if (result.ok && result.text) {
+        generatedText = result.text;
+        break;
       }
-    };
 
-    const response = await fetch(apiUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(geminiPayload)
-    });
+      lastError = result.data;
+      lastStatus = result.status;
 
-    const data = (await response.json()) as any;
+      // If key is invalid (400 / API_KEY_INVALID), stop immediately
+      const errMsg = result.data?.error?.message || "";
+      if (result.status === 400 && (errMsg.includes("API_KEY") || errMsg.includes("key"))) {
+        break;
+      }
 
-    if (!response.ok) {
-      const errMessage = data?.error?.message || "Failed to communicate with AI provider.";
-      const isKeyError = response.status === 400 && (errMessage.includes("API_KEY") || errMessage.includes("key"));
-      
-      res.status(response.status).json({
+      // If 404 (model not found / not supported), proceed to try next model
+    }
+
+    // 2. If candidates all failed with 404, dynamically query ListModels to find available models
+    if (!generatedText && (lastStatus === 404 || lastError?.error?.message?.includes("not found"))) {
+      try {
+        const listRes = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`
+        );
+        if (listRes.ok) {
+          const listData = (await listRes.json()) as any;
+          const models: any[] = listData.models || [];
+          
+          // Find first model supporting generateContent
+          const usable = models.find(
+            (m) =>
+              Array.isArray(m.supportedGenerationMethods) &&
+              m.supportedGenerationMethods.includes("generateContent")
+          );
+
+          if (usable && usable.name) {
+            const dynamicResult = await callGeminiGenerate(apiKey, "v1beta", usable.name, fullPrompt);
+            if (dynamicResult.ok && dynamicResult.text) {
+              generatedText = dynamicResult.text;
+            } else {
+              lastError = dynamicResult.data;
+              lastStatus = dynamicResult.status;
+            }
+          }
+        }
+      } catch (listErr) {
+        console.warn("[ListModels Discovery Failed]", listErr);
+      }
+    }
+
+    if (!generatedText) {
+      const errMessage = lastError?.error?.message || "Failed to communicate with AI provider.";
+      const isKeyError = lastStatus === 400 && (errMessage.includes("API_KEY") || errMessage.includes("key"));
+
+      res.status(lastStatus >= 400 && lastStatus < 600 ? lastStatus : 502).json({
         error: isKeyError ? "INVALID_API_KEY" : "AI_PROVIDER_ERROR",
         message: isKeyError ? "Invalid Gemini API key. Please check your key." : errMessage
       });
       return;
     }
 
-    const candidate = data.candidates?.[0];
-    const rawText = candidate?.content?.parts?.[0]?.text;
-
-    if (!rawText) {
-      res.status(502).json({
-        error: "NO_CONTENT_GENERATED",
-        message: "The AI did not generate a response. Please try again."
-      });
-      return;
-    }
-
     // Clean up any markdown code fence wrappers
-    let polished = rawText.trim();
+    let polished = generatedText.trim();
     if (polished.startsWith("```html")) {
       polished = polished.replace(/^```html\s*/i, "").replace(/\s*```$/, "");
     } else if (polished.startsWith("```")) {
