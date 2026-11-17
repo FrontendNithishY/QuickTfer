@@ -1,0 +1,9 @@
+# public/robots.txt
+User-agent: *
+Allow: /
+
+# Exclude private user paste URLs from indexation
+Disallow: /p/
+Disallow: /paste/
+
+Sitemap: https://quicktrfr.vercel.app/sitemap.xml

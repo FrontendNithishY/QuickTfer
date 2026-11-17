@@ -11,9 +11,23 @@ import { Dashboard } from "./components/Dashboard.js";
 import { UserProfile } from "./components/UserProfile.js";
 import { AuthModal } from "./components/AuthModal.js";
 import { AboutModal, TermsModal } from "./components/LegalModals.js";
+import {
+  BurnAfterReadingPage,
+  EncryptedPastePage,
+  QuickCodePage,
+  MathNotesPage,
+} from "./components/LandingPages.js";
 import { getAuthToken, removeAuthToken, saveEditToken } from "./utils/storage.js";
 
-type RouteView = "editor" | "paste" | "dashboard" | "profile";
+type RouteView =
+  | "editor"
+  | "paste"
+  | "dashboard"
+  | "profile"
+  | "burn-after-reading"
+  | "encrypted-paste"
+  | "quick-code"
+  | "math-notes";
 
 export const App: React.FC = () => {
   const [view, setView] = useState<RouteView>("editor");
@@ -99,6 +113,14 @@ export const App: React.FC = () => {
         setView("profile");
       } else if (path === "/dashboard") {
         setView("dashboard");
+      } else if (path === "/burn-after-reading") {
+        setView("burn-after-reading");
+      } else if (path === "/encrypted-paste") {
+        setView("encrypted-paste");
+      } else if (path === "/quick-code") {
+        setView("quick-code");
+      } else if (path === "/math-notes") {
+        setView("math-notes");
       } else {
         setView("editor");
       }
@@ -113,6 +135,29 @@ export const App: React.FC = () => {
     window.history.pushState({}, "", path);
     setView(newView);
     window.scrollTo(0, 0);
+  };
+
+  const handleLandingAction = (preset?: "burn" | "encrypt" | "quick" | "math") => {
+    if (preset === "math") {
+      setForkDraft({
+        title: "Calculus & KaTeX Proof Notes",
+        content: "<h2>Mathematical Formulation</h2><p>Here is an inline proof: $e^{i\\pi} + 1 = 0$.</p><p>And a display formula:</p><p>$$f(x) = \\int_{-\\infty}^{\\infty} \\hat{f}(\\xi)\\,e^{2 \\pi i \\xi x} \\,d\\xi$$</p>"
+      });
+    } else if (preset === "burn") {
+      setForkDraft({
+        title: "Confidential Self-Destructing Note",
+        content: "<p>This note will permanently self-destruct after its first read. Enter your private password or token here.</p>"
+      });
+    } else if (preset === "encrypt") {
+      setForkDraft({
+        title: "Encrypted Secure Note",
+        content: "<p>This note is protected with client-side AES-256-GCM encryption.</p>"
+      });
+    }
+    navigateTo("editor", "/");
+    if (preset === "quick") {
+      setIsQuickCodeInputOpen(true);
+    }
   };
 
   const handleOpenPublish = (title: string, content: string) => {
@@ -247,27 +292,68 @@ export const App: React.FC = () => {
             onNavigateHome={() => navigateTo("editor", "/")}
           />
         )}
+
+        {view === "burn-after-reading" && (
+          <BurnAfterReadingPage
+            onStartAction={handleLandingAction}
+            onOpenQuickCode={() => setIsQuickCodeInputOpen(true)}
+          />
+        )}
+
+        {view === "encrypted-paste" && (
+          <EncryptedPastePage
+            onStartAction={handleLandingAction}
+            onOpenQuickCode={() => setIsQuickCodeInputOpen(true)}
+          />
+        )}
+
+        {view === "quick-code" && (
+          <QuickCodePage
+            onStartAction={handleLandingAction}
+            onOpenQuickCode={() => setIsQuickCodeInputOpen(true)}
+          />
+        )}
+
+        {view === "math-notes" && (
+          <MathNotesPage
+            onStartAction={handleLandingAction}
+            onOpenQuickCode={() => setIsQuickCodeInputOpen(true)}
+          />
+        )}
       </main>
 
       {/* Footer */}
-      <footer className="no-print border-t border-gray-200 dark:border-slate-800/80 bg-white dark:bg-slate-900 py-6 text-xs text-gray-500 dark:text-gray-400 transition-colors">
-        <div className="max-w-6xl mx-auto px-4 flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex flex-col items-center md:items-start gap-1">
-            <div className="flex items-center gap-1.5 font-bold text-gray-800 dark:text-gray-200">
-              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-              <span>Quick<span className="text-blue-600">Trfr</span></span>
-              <span className="font-normal text-gray-400">· Independent Text Publishing & Fast Transfer</span>
+      <footer className="no-print border-t border-gray-200 dark:border-slate-800/80 bg-white dark:bg-slate-900 py-8 text-xs text-gray-500 dark:text-gray-400 transition-colors">
+        <div className="max-w-6xl mx-auto px-4 flex flex-col gap-6">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="flex flex-col items-center md:items-start gap-1">
+              <div className="flex items-center gap-1.5 font-bold text-gray-800 dark:text-gray-200">
+                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                <span>Quick<span className="text-blue-600">Trfr</span></span>
+                <span className="font-normal text-gray-400">· Independent Text Publishing & Fast Transfer</span>
+              </div>
+              <p className="text-[11px] text-gray-400 dark:text-gray-500">
+                © {new Date().getFullYear()} QuickTrfr. All rights reserved. Zero-logging temporary sharing & AES-256-GCM encryption.
+              </p>
             </div>
-            <p className="text-[11px] text-gray-400 dark:text-gray-500">
-              © {new Date().getFullYear()} QuickTrfr. All rights reserved. Zero-logging temporary sharing & AES-256-GCM encryption.
-            </p>
+            <div className="flex flex-wrap items-center justify-center gap-5 font-medium">
+              <button onClick={() => navigateTo("editor", "/")} className="hover:text-blue-600 transition">Create Note</button>
+              <button onClick={() => setIsQuickCodeInputOpen(true)} className="hover:text-blue-600 transition">Quick Code</button>
+              <button onClick={() => setIsAboutOpen(true)} className="hover:text-blue-600 transition">About</button>
+              <button onClick={() => setIsTermsOpen(true)} className="hover:text-blue-600 transition">Terms & Privacy</button>
+              <a href="/api/health" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 transition">Status</a>
+            </div>
           </div>
-          <div className="flex flex-wrap items-center justify-center gap-5 font-medium">
-            <button onClick={() => navigateTo("editor", "/")} className="hover:text-blue-600 transition">Create Note</button>
-            <button onClick={() => setIsQuickCodeInputOpen(true)} className="hover:text-blue-600 transition">Quick Code</button>
-            <button onClick={() => setIsAboutOpen(true)} className="hover:text-blue-600 transition">About</button>
-            <button onClick={() => setIsTermsOpen(true)} className="hover:text-blue-600 transition">Terms & Privacy</button>
-            <a href="/api/health" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 transition">Status</a>
+
+          {/* Programmatic Intent Landing Navigation for SEO */}
+          <div className="pt-4 border-t border-gray-100 dark:border-slate-800/60 flex flex-wrap items-center justify-center sm:justify-start gap-x-6 gap-y-2 text-[11px] text-gray-400 dark:text-gray-500">
+            <span className="font-semibold text-gray-600 dark:text-gray-400">Features & Solutions:</span>
+            <button onClick={() => navigateTo("burn-after-reading", "/burn-after-reading")} className="hover:text-blue-600 transition">Burn After Reading</button>
+            <button onClick={() => navigateTo("encrypted-paste", "/encrypted-paste")} className="hover:text-blue-600 transition">Encrypted Pastebin</button>
+            <button onClick={() => navigateTo("quick-code", "/quick-code")} className="hover:text-blue-600 transition">PIN Transfer (PC to Mobile)</button>
+            <button onClick={() => navigateTo("math-notes", "/math-notes")} className="hover:text-blue-600 transition">LaTeX Math Notes</button>
+            <a href="/sitemap.xml" target="_blank" className="hover:text-blue-600 transition">Sitemap</a>
+            <a href="/robots.txt" target="_blank" className="hover:text-blue-600 transition">Robots.txt</a>
           </div>
         </div>
       </footer>

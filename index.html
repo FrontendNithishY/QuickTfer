@@ -7,11 +7,42 @@
     <meta name="description" content="QuickTrfr is an independent, fast and secure text publishing and transfer platform. Create rich notes, encrypt with AES-256-GCM, and share instantly anywhere using 60-minute quick codes and QR codes." />
     <meta name="author" content="QuickTrfr" />
     <meta name="copyright" content="QuickTrfr" />
-    <meta property="og:title" content="QuickTrfr - Fast Paste, Transfer & 60-Minute Quick Sharing" />
-    <meta property="og:description" content="Publish rich text notes, password encrypt documents, and transfer content anywhere with 60-minute quick codes." />
-    <meta property="og:url" content="https://quicktrfr.vercel.app" />
-    <meta property="og:type" content="website" />
     <link rel="canonical" href="https://quicktrfr.vercel.app" />
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://quicktrfr.vercel.app" />
+    <meta property="og:title" content="QuickTrfr - Fast Paste & Encrypted Transfer" />
+    <meta property="og:description" content="Share encrypted notes and transfer text anywhere with 60-minute quick codes." />
+    <meta property="og:image" content="https://quicktrfr.vercel.app/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+
+    <!-- Twitter / X Cards -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="QuickTrfr - Fast Paste & Encrypted Transfer" />
+    <meta name="twitter:description" content="Share encrypted notes and transfer text anywhere with 60-minute quick codes." />
+    <meta name="twitter:image" content="https://quicktrfr.vercel.app/og-image.png" />
+
+    <!-- Schema.org JSON-LD WebApplication -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "QuickTrfr",
+      "url": "https://quicktrfr.vercel.app",
+      "applicationCategory": "UtilitiesApplication",
+      "operatingSystem": "All",
+      "description": "Secure text publishing, AES-256 encrypted note sharing, and cross-device transfer via 60-minute PIN codes.",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      }
+    }
+    </script>
+
+    <!-- Favicon & Stylesheets -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' fill='none'><rect width='32' height='32' rx='8' fill='%232563eb'/><path d='M18 4L8 18h7l-2 10 11-14h-8l2-10z' fill='%23ffffff'/></svg>" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.css" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -19,7 +50,43 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   </head>
   <body class="bg-gray-50 text-gray-900 antialiased selection:bg-blue-100 selection:text-blue-900 min-h-screen flex flex-col">
-    <div id="root" class="flex-1 flex flex-col"></div>
+    <!-- Semantic Pre-Rendered Fallback for Search Engine Crawlers -->
+    <div id="root" class="flex-1 flex flex-col">
+      <header style="padding: 2rem 1rem; text-align: center; background: #ffffff; border-bottom: 1px solid #e2e8f0;">
+        <h1 style="font-size: 1.75rem; font-weight: 800; color: #0f172a; margin-bottom: 0.5rem;">
+          QuickTrfr — Fast Paste, Transfer & 60-Minute Quick Sharing
+        </h1>
+        <p style="font-size: 1rem; color: #64748b; max-width: 700px; margin: 0 auto;">
+          An independent, high-utility text publishing and secure transfer web application. Write rich formatted notes, password-encrypt documents with AES-256-GCM, create single-view self-destructing notes, and pair devices in 60 seconds with 6-digit PIN codes.
+        </p>
+      </header>
+
+      <main style="max-width: 900px; margin: 2rem auto; padding: 0 1rem;">
+        <section style="margin-bottom: 2rem;">
+          <h2 style="font-size: 1.25rem; font-weight: 700; color: #1e293b;">Key Capabilities & Features</h2>
+          <ul style="line-height: 1.8; color: #334155;">
+            <li><strong>60-Minute Quick Share:</strong> Generate temporary 6-digit pairing PINs and QR tokens to transfer text between PC and mobile instantly.</li>
+            <li><strong>Zero-Knowledge AES-256-GCM Encryption:</strong> Client-side cryptographic key derivation (PBKDF2) for confidential notes and passwords.</li>
+            <li><strong>Burn-After-Reading:</strong> One-time secret link that permanently self-destructs immediately after its initial read.</li>
+            <li><strong>KaTeX LaTeX Math & Markdown:</strong> Formulate academic math proofs, equations, tables, and media embeds with live preview.</li>
+          </ul>
+        </section>
+
+        <section style="margin-bottom: 2rem;">
+          <h3 style="font-size: 1.1rem; font-weight: 700; color: #1e293b;">Explore QuickTrfr Solutions</h3>
+          <nav style="display: flex; flex-wrap: wrap; gap: 1rem;">
+            <a href="/burn-after-reading" style="color: #2563eb; text-decoration: underline;">Self-Destructing Notes (Burn After Reading)</a>
+            <a href="/encrypted-paste" style="color: #2563eb; text-decoration: underline;">Zero-Knowledge Encrypted Pastebin</a>
+            <a href="/quick-code" style="color: #2563eb; text-decoration: underline;">Cross-Device 6-Digit PIN Transfer</a>
+            <a href="/math-notes" style="color: #2563eb; text-decoration: underline;">LaTeX & KaTeX Markdown Note Sharing</a>
+          </nav>
+        </section>
+      </main>
+
+      <footer style="padding: 1.5rem 1rem; text-align: center; font-size: 0.85rem; color: #94a3b8; border-top: 1px solid #e2e8f0;">
+        <p>© 2026 QuickTrfr. All rights reserved. Fast text transfer, zero logging & AES-256-GCM encryption.</p>
+      </footer>
+    </div>
     <script type="module" src="/src/client/main.tsx"></script>
   </body>
 </html>

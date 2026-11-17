@@ -10,7 +10,14 @@ const clientDist = path.resolve(process.cwd(), "dist");
 if (fs.existsSync(clientDist)) {
   app.use(express.static(clientDist));
   app.get("*", (req, res, next) => {
-    if (req.path.startsWith("/api") || req.path.startsWith("/uploads") || req.path.startsWith("/raw")) {
+    if (
+      req.path.startsWith("/api") ||
+      req.path.startsWith("/uploads") ||
+      req.path.startsWith("/raw") ||
+      req.path === "/robots.txt" ||
+      req.path === "/sitemap.xml" ||
+      req.path === "/og-image.png"
+    ) {
       return next();
     }
     res.sendFile(path.join(clientDist, "index.html"));
