@@ -8,7 +8,7 @@ import quickShareRouter from "../src/server/routes/quickShare.js";
 import uploadRouter from "../src/server/routes/upload.js";
 import aiRouter from "../src/server/routes/ai.js";
 import { highlightCodeTokens } from "../src/client/utils/syntaxHighlight.js";
-
+import duoRouter from "../src/server/routes/duo.js";
 
 const app = express();
 app.use(express.json());
@@ -17,6 +17,8 @@ app.use("/api", pastesRouter);
 app.use("/api", quickShareRouter);
 app.use("/api", uploadRouter);
 app.use("/api", aiRouter);
+app.use("/api", duoRouter);
+
 app.get("/raw/:slug", (req, res, next) => {
   req.url = `/pastes/${req.params.slug}/raw`;
   pastesRouter(req, res, next);
@@ -304,9 +306,82 @@ print(f"Total: {metrics['total']} | Average: {metrics['mean']:.2f} | Status: {me
     assert.ok(tokenizedHtml.includes('<span class="token-string">"High Performance"</span>'), "string formatted properly");
     console.log("✓ Single-pass syntax highlighting engine verified with zero tag leakage.");
 
+    // 14. Test DuoPaste Real-Time Collaborative Live Editor
+    console.log("[Test 14] Testing DuoPaste Real-Time Collaborative Live Editor...");
+    // Step 1: User A creates a DuoPaste session
+    const createDuoRes = await fetch(`${baseUrl}/api/duo/create`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: "Team Collaborative Draft",
+        content: "<p>Original paragraph written by User A.</p>"
+      })
+    });
+    assert.strictEqual(createDuoRes.status, 201, "Duo create should return 201");
+    const duoDataA = await createDuoRes.json() as any;
+    assert.ok(duoDataA.pin, "DuoPaste PIN must be generated");
+    assert.strictEqual(duoDataA.pin.length, 6, "PIN should be 6 characters/digits");
+    assert.ok(duoDataA.clientId, "Host client ID must be generated");
+    assert.strictEqual(duoDataA.role, "host");
+    console.log(`✓ User A started DuoPaste session with PIN: ${duoDataA.pin}`);
+
+    // Step 2: User B joins with PIN
+    const joinDuoRes = await fetch(`${baseUrl}/api/duo/join`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pin: duoDataA.pin })
+    });
+    assert.strictEqual(joinDuoRes.status, 200, "Duo join should return 200");
+    const duoDataB = await joinDuoRes.json() as any;
+    assert.strictEqual(duoDataB.role, "guest");
+    assert.ok(duoDataB.clientId);
+    assert.strictEqual(duoDataB.session.title, "Team Collaborative Draft");
+    assert.ok(duoDataB.session.content.includes("Original paragraph"));
+    console.log(`✓ User B successfully joined DuoPaste session ${duoDataA.pin}`);
+
+    // Step 3: User B makes an edit and syncs
+    const syncRes = await fetch(`${baseUrl}/api/duo/sync`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        pin: duoDataA.pin,
+        clientId: duoDataB.clientId,
+        title: "Team Collaborative Draft (Updated)",
+        content: "<p>Original paragraph written by User A.</p><p>Second paragraph added by User B.</p>"
+      })
+    });
+    assert.strictEqual(syncRes.status, 200, "Sync should return 200");
+    const syncData = await syncRes.json() as any;
+    assert.ok(syncData.version > 1, "Session version must increment");
+
+    // Step 4: Verify synced session reflects both users' changes
+    const fetchDuoRes = await fetch(`${baseUrl}/api/duo/${duoDataA.pin}`);
+    assert.strictEqual(fetchDuoRes.status, 200);
+    const fetchedDuo = await fetchDuoRes.json() as any;
+    assert.strictEqual(fetchedDuo.session.title, "Team Collaborative Draft (Updated)");
+    assert.ok(fetchedDuo.session.content.includes("Second paragraph added by User B."));
+    console.log("✓ Live bi-directional keystroke sync verified between User A and User B.");
+
+    // Step 5: Freeze and publish into a permanent shared paste
+    const publishDuoRes = await fetch(`${baseUrl}/api/duo/publish`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pin: duoDataA.pin, visibility: "public" })
+    });
+    assert.strictEqual(publishDuoRes.status, 201, "Publish should return 201");
+    const pubDuoData = await publishDuoRes.json() as any;
+    assert.ok(pubDuoData.slug, "Permanent slug must be returned");
+
+    // Verify published paste in pastes table
+    const getSharedPaste = await (await fetch(`${baseUrl}/api/pastes/${pubDuoData.slug}`)).json() as any;
+    assert.strictEqual(getSharedPaste.title, "Team Collaborative Draft (Updated)");
+    assert.ok(getSharedPaste.content.includes("Second paragraph added by User B."));
+    console.log(`✓ Shared DuoPaste frozen and published to permanent paste: /p/${pubDuoData.slug}`);
+
     console.log("\n=======================================================");
-    console.log("🎉 ALL AUTOMATED TESTS PASSED SUCCESSFULLY! (13/13) 🎉");
+    console.log("🎉 ALL AUTOMATED TESTS PASSED SUCCESSFULLY! (14/14) 🎉");
     console.log("=======================================================\n");
+
 
   } finally {
     server.close();

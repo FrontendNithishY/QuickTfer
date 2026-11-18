@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { User, QuickShareData } from "./types.js";
+import { User, QuickShareData, DuoSession } from "./types.js";
 import { Navbar } from "./components/Navbar.js";
+
 import { Editor } from "./components/Editor.js";
 import { PublishModal } from "./components/PublishModal.js";
 import { PublishSuccessModal } from "./components/PublishSuccessModal.js";
@@ -11,6 +12,8 @@ import { Dashboard } from "./components/Dashboard.js";
 import { UserProfile } from "./components/UserProfile.js";
 import { AuthModal } from "./components/AuthModal.js";
 import { AboutModal, TermsModal } from "./components/LegalModals.js";
+import { DuoPasteModal } from "./components/DuoPasteModal.js";
+import { DuoPasteEditor } from "./components/DuoPasteEditor.js";
 import {
   BurnAfterReadingPage,
   EncryptedPastePage,
@@ -23,6 +26,7 @@ import { getAuthToken, removeAuthToken, saveEditToken } from "./utils/storage.js
 
 type RouteView =
   | "editor"
+  | "duo"
   | "paste"
   | "dashboard"
   | "profile"
@@ -31,6 +35,7 @@ type RouteView =
   | "quick-code"
   | "math-notes"
   | "404";
+
 
 export const App: React.FC = () => {
   const [view, setView] = useState<RouteView>("editor");
@@ -58,6 +63,14 @@ export const App: React.FC = () => {
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [isTermsOpen, setIsTermsOpen] = useState(false);
+
+  // DuoPaste Live Collaboration
+  const [isDuoModalOpen, setIsDuoModalOpen] = useState(false);
+  const [duoModalTab, setDuoModalTab] = useState<"start" | "join">("start");
+  const [activeDuoSession, setActiveDuoSession] = useState<DuoSession | null>(null);
+  const [duoClientId, setDuoClientId] = useState<string>("");
+  const [duoRole, setDuoRole] = useState<"host" | "guest">("host");
+
 
   // Sync theme
   useEffect(() => {
@@ -110,10 +123,35 @@ export const App: React.FC = () => {
             }
           })
           .catch(() => setView("editor"));
+      } else if (path.startsWith("/duo/")) {
+        const pin = path.slice(5).trim();
+        if (pin) {
+          fetch("/api/duo/join", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ pin })
+          })
+            .then(res => res.json())
+            .then(data => {
+              if (data.session) {
+                setActiveDuoSession(data.session);
+                setDuoClientId(data.clientId);
+                setDuoRole("guest");
+                setView("duo");
+              } else {
+                alert(data.error || "DuoPaste session not found or expired.");
+                setView("editor");
+              }
+            })
+            .catch(() => setView("editor"));
+        } else {
+          setView("editor");
+        }
       } else if (path.startsWith("/u/")) {
         const username = path.slice(3);
         setProfileUsername(username);
         setView("profile");
+
       } else if (path === "/dashboard") {
         setView("dashboard");
       } else if (path === "/burn-after-reading") {
@@ -239,6 +277,10 @@ export const App: React.FC = () => {
         user={user}
         onOpenAuth={() => setIsAuthOpen(true)}
         onOpenQuickCode={() => setIsQuickCodeInputOpen(true)}
+        onOpenDuoPaste={(tab = "start") => {
+          setDuoModalTab(tab);
+          setIsDuoModalOpen(true);
+        }}
         onLogout={handleLogout}
         onNavigateHome={() => navigateTo("editor", "/")}
         onNavigateDashboard={() => navigateTo("dashboard", "/dashboard")}
@@ -260,8 +302,29 @@ export const App: React.FC = () => {
               setCurrentSlug(slug);
               navigateTo("paste", `/p/${slug}`);
             }}
+            onStartDuoPaste={() => {
+              setDuoModalTab("start");
+              setIsDuoModalOpen(true);
+            }}
           />
         )}
+
+        {view === "duo" && activeDuoSession && (
+          <DuoPasteEditor
+            initialSession={activeDuoSession}
+            clientId={duoClientId}
+            role={duoRole}
+            onLeave={() => {
+              setActiveDuoSession(null);
+              navigateTo("editor", "/");
+            }}
+            onPublishSuccess={(slug) => {
+              setActiveDuoSession(null);
+              navigateTo("paste", `/p/${slug}`);
+            }}
+          />
+        )}
+
 
         {view === "paste" && (
           <PasteView
@@ -449,6 +512,21 @@ export const App: React.FC = () => {
         isOpen={isTermsOpen}
         onClose={() => setIsTermsOpen(false)}
       />
+
+      <DuoPasteModal
+        isOpen={isDuoModalOpen}
+        onClose={() => setIsDuoModalOpen(false)}
+        initialTab={duoModalTab}
+        currentDraft={forkDraft}
+        onEnterSession={(session, clientId, role) => {
+          setActiveDuoSession(session);
+          setDuoClientId(clientId);
+          setDuoRole(role);
+          setView("duo");
+          window.history.pushState({}, "", `/duo/${session.pin}`);
+        }}
+      />
     </div>
   );
 };
+

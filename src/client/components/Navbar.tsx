@@ -10,13 +10,15 @@ import {
   LogOut,
   LayoutDashboard,
   ShieldCheck,
-  Zap
+  Zap,
+  Users
 } from "lucide-react";
 
 interface NavbarProps {
   user: User | null;
   onOpenAuth: () => void;
   onOpenQuickCode: () => void;
+  onOpenDuoPaste: (tab?: "start" | "join") => void;
   onLogout: () => void;
   onNavigateHome: () => void;
   onNavigateDashboard: () => void;
@@ -29,6 +31,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   user,
   onOpenAuth,
   onOpenQuickCode,
+  onOpenDuoPaste,
   onLogout,
   onNavigateHome,
   onNavigateDashboard,
@@ -36,6 +39,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   darkMode,
   onToggleDarkMode
 }) => {
+
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
@@ -79,6 +83,18 @@ export const Navbar: React.FC<NavbarProps> = ({
             <span className="hidden sm:inline">New Paste</span>
           </button>
 
+          {/* DuoPaste Live Collaboration Button */}
+          <button
+            type="button"
+            onClick={() => onOpenDuoPaste("start")}
+            aria-label="Start or join DuoPaste live collaboration"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold rounded-lg bg-purple-50 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-800/80 text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/60 transition shadow-xs"
+            title="Start or join two-person live synchronized paste"
+          >
+            <Users className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+            <span className="font-semibold text-xs tracking-tight">DuoPaste</span>
+          </button>
+
           {/* 60-Minute Quick Code Access Button */}
           <button
             type="button"
@@ -90,6 +106,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <Zap className="w-4 h-4 text-amber-600 dark:text-amber-400 fill-amber-500" />
             <span className="font-mono text-xs uppercase tracking-wider font-bold">Quick Code</span>
           </button>
+
 
           {/* Dark Mode Toggle */}
           <button

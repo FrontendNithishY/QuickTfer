@@ -29,7 +29,8 @@ import {
   X,
   ExternalLink,
   Check,
-  Terminal
+  Terminal,
+  Users
 } from "lucide-react";
 import katex from "katex";
 import { CodeCompilerModal } from "./CodeCompilerModal.js";
@@ -39,6 +40,7 @@ interface EditorProps {
   initialContent?: string;
   onPublishClick: (title: string, content: string) => void;
   onPublishSuccess?: (slug: string) => void;
+  onStartDuoPaste?: () => void;
 }
 
 export const Editor: React.FC<EditorProps> = ({
@@ -46,7 +48,9 @@ export const Editor: React.FC<EditorProps> = ({
   initialContent = "",
   onPublishClick,
   onPublishSuccess,
+  onStartDuoPaste,
 }) => {
+
   const [title, setTitle] = useState(initialTitle);
   const [wordCount, setWordCount] = useState(0);
   const [charCount, setCharCount] = useState(0);
@@ -581,6 +585,19 @@ export const Editor: React.FC<EditorProps> = ({
               </button>
             )}
 
+            {/* Start DuoPaste Collaboration Button */}
+            {onStartDuoPaste && (
+              <button
+                type="button"
+                onClick={onStartDuoPaste}
+                className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/40 hover:bg-purple-100/80 dark:hover:bg-purple-900/60 border border-purple-300 dark:border-purple-800 rounded-lg shadow-sm transition cursor-pointer"
+                title="Start DuoPaste: Real-time two-person live synchronized editor"
+              >
+                <Users className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                <span>Start DuoPaste</span>
+              </button>
+            )}
+
             {/* Code Highlighted Compiler & Formatter Button (Left of AI Polish) */}
             <button
               type="button"
@@ -591,6 +608,7 @@ export const Editor: React.FC<EditorProps> = ({
               <Terminal className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
               <span>Code highlighted</span>
             </button>
+
 
             <div className="inline-flex items-center rounded-lg border border-purple-200 dark:border-purple-800/80 bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-950/40 dark:to-indigo-950/40 shadow-sm overflow-hidden">
               <button

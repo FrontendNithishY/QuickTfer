@@ -94,9 +94,25 @@ export function initDatabase() {
       FOREIGN KEY (paste_id) REFERENCES pastes(id) ON DELETE CASCADE
     );
     CREATE INDEX IF NOT EXISTS idx_tags_tag ON tags(tag);
+
+    CREATE TABLE IF NOT EXISTS duo_sessions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      pin TEXT UNIQUE NOT NULL,
+      title TEXT NOT NULL DEFAULT 'Untitled DuoPaste',
+      content TEXT NOT NULL DEFAULT '',
+      version INTEGER NOT NULL DEFAULT 1,
+      host_client_id TEXT NOT NULL,
+      guest_client_id TEXT,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      published_slug TEXT,
+      last_active_at INTEGER NOT NULL,
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_duo_sessions_pin ON duo_sessions(pin);
   `);
 
   console.log("[Database] Initialized successfully with WAL mode.");
 }
+
 
 initDatabase();
