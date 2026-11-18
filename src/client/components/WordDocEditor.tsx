@@ -51,7 +51,12 @@ import {
   Users,
   Radio,
   ExternalLink,
-  QrCode
+  QrCode,
+  Quote,
+  Rows,
+  PanelLeft,
+  BookOpen,
+  Sliders
 } from "lucide-react";
 import katex from "katex";
 import * as mammoth from "mammoth";
@@ -162,6 +167,17 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
   const [showStylesMenu, setShowStylesMenu] = useState(false);
   const [showStatsModal, setShowStatsModal] = useState(false);
   const [showFindReplace, setShowFindReplace] = useState(false);
+  const [showTableToolsMenu, setShowTableToolsMenu] = useState(false);
+  const [showBorderMenu, setShowBorderMenu] = useState(false);
+  const [showTextEffectsMenu, setShowTextEffectsMenu] = useState(false);
+  const [showNavPane, setShowNavPane] = useState(false);
+  const [showProofingModal, setShowProofingModal] = useState(false);
+  const [pageBorderStyle, setPageBorderStyle] = useState<"none" | "box" | "double" | "shadow">("none");
+  const [runningHeaderText, setRunningHeaderText] = useState<string>("");
+  const [runningFooterText, setRunningFooterText] = useState<string>("");
+  const [pageNumberFormat, setPageNumberFormat] = useState<"standard" | "compact" | "hash">("standard");
+  const [hyphenation, setHyphenation] = useState(false);
+  const [headingsList, setHeadingsList] = useState<{ id: string; text: string; level: number; pageIdx: number }[]>([]);
   
   // Find & Replace
   const [findText, setFindText] = useState("");
@@ -275,6 +291,7 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
     let noSpaces = 0;
     let paras = 0;
 
+    const foundHeadings: { id: string; text: string; level: number; pageIdx: number }[] = [];
     pages.forEach((_, i) => {
       const el = pageRefs.current[i];
       const text = el ? (el.innerText || "") : "";
@@ -285,8 +302,26 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
       }
       chars += text.length;
       noSpaces += text.replace(/\s+/g, "").length;
+
+      if (el) {
+        const hs = el.querySelectorAll("h1, h2, h3");
+        hs.forEach((h, hIdx) => {
+          const txt = h.textContent?.trim() || "";
+          if (txt) {
+            const hId = `doc-heading-${i}-${hIdx}`;
+            h.id = hId;
+            foundHeadings.push({
+              id: hId,
+              text: txt,
+              level: h.tagName === "H1" ? 1 : h.tagName === "H2" ? 2 : 3,
+              pageIdx: i
+            });
+          }
+        });
+      }
     });
 
+    setHeadingsList(foundHeadings);
     setWordCount(words);
     setCharCount(chars);
     setCharNoSpaces(noSpaces);
@@ -740,6 +775,436 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
     setShowTableGridPicker(false);
   };
 
+  // Helper to find the table cell or table element under the cursor
+  const getSelectedTableCell = (): HTMLTableCellElement | null => {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return null;
+    let node: Node | null = sel.anchorNode;
+    while (node && node !== document.body) {
+      if (node instanceof HTMLTableCellElement) return node;
+      node = node.parentNode;
+    }
+    return null;
+  };
+
+  const handleAddTableRow = (position: "above" | "below") => {
+    const cell = getSelectedTableCell();
+    if (!cell) {
+      alert("Please click inside a table cell first to insert a row.");
+      return;
+    }
+    const row = cell.closest("tr");
+    const table = cell.closest("table");
+    if (!row || !table) return;
+
+    const colCount = row.cells.length;
+    const newRow = document.createElement("tr");
+    for (let i = 0; i < colCount; i++) {
+      const newCell = document.createElement("td");
+      newCell.style.border = "1px solid #cbd5e1";
+      newCell.style.padding = "8px 12px";
+      newCell.innerHTML = "New cell";
+      newRow.appendChild(newCell);
+    }
+
+    if (position === "above") {
+      row.parentNode?.insertBefore(newRow, row);
+    } else {
+      row.parentNode?.insertBefore(newRow, row.nextSibling);
+    }
+    setShowTableToolsMenu(false);
+    updateStats();
+    queueCollabSync();
+  };
+
+  const handleAddTableColumn = (position: "left" | "right") => {
+    const cell = getSelectedTableCell();
+    if (!cell) {
+      alert("Please click inside a table cell first to insert a column.");
+      return;
+    }
+    const table = cell.closest("table");
+    if (!table) return;
+
+    const cellIndex = cell.cellIndex;
+    const rows = table.rows;
+
+    for (let r = 0; r < rows.length; r++) {
+      const targetRow = rows[r];
+      const isHeader = targetRow.parentNode?.nodeName === "THEAD" || targetRow.cells[0]?.tagName === "TH";
+      const newCell = document.createElement(isHeader ? "th" : "td");
+      newCell.style.border = "1px solid #94a3b8";
+      newCell.style.padding = "8px 12px";
+      if (isHeader) {
+        newCell.style.backgroundColor = "#f1f5f9";
+        newCell.style.fontWeight = "bold";
+        newCell.innerHTML = "New Header";
+      } else {
+        newCell.innerHTML = "New cell";
+      }
+
+      const insertIndex = position === "left" ? cellIndex : cellIndex + 1;
+      if (insertIndex >= targetRow.cells.length) {
+        targetRow.appendChild(newCell);
+      } else {
+        targetRow.insertBefore(newCell, targetRow.cells[insertIndex]);
+      }
+    }
+    setShowTableToolsMenu(false);
+    updateStats();
+    queueCollabSync();
+  };
+
+  const handleDeleteTableRow = () => {
+    const cell = getSelectedTableCell();
+    if (!cell) {
+      alert("Please click inside a table row to delete it.");
+      return;
+    }
+    const row = cell.closest("tr");
+    const table = cell.closest("table");
+    if (!row || !table) return;
+
+    if (table.rows.length <= 1) {
+      table.remove();
+    } else {
+      row.remove();
+    }
+    setShowTableToolsMenu(false);
+    updateStats();
+    queueCollabSync();
+  };
+
+  const handleDeleteTableColumn = () => {
+    const cell = getSelectedTableCell();
+    if (!cell) {
+      alert("Please click inside a table column to delete it.");
+      return;
+    }
+    const table = cell.closest("table");
+    if (!table) return;
+
+    const cellIndex = cell.cellIndex;
+    if (table.rows[0]?.cells.length <= 1) {
+      table.remove();
+    } else {
+      for (let r = 0; r < table.rows.length; r++) {
+        table.rows[r].deleteCell(cellIndex);
+      }
+    }
+    setShowTableToolsMenu(false);
+    updateStats();
+    queueCollabSync();
+  };
+
+  const handleDeleteEntireTable = () => {
+    const cell = getSelectedTableCell();
+    if (!cell) {
+      alert("Please click inside a table to delete it.");
+      return;
+    }
+    const table = cell.closest("table");
+    if (table) {
+      table.remove();
+      setShowTableToolsMenu(false);
+      updateStats();
+      queueCollabSync();
+    }
+  };
+
+  const handleApplyTableStyle = (styleName: "classic" | "striped" | "navy" | "minimal" | "modern") => {
+    const cell = getSelectedTableCell();
+    if (!cell) {
+      alert("Please click inside a table first to apply a style.");
+      return;
+    }
+    const table = cell.closest("table");
+    if (!table) return;
+
+    table.style.width = "100%";
+    table.style.borderCollapse = "collapse";
+    table.style.margin = "16px 0";
+
+    const rows = table.rows;
+    for (let r = 0; r < rows.length; r++) {
+      const row = rows[r];
+      const isHeader = r === 0 || row.parentNode?.nodeName === "THEAD";
+
+      for (let c = 0; c < row.cells.length; c++) {
+        const td = row.cells[c];
+        td.style.padding = "8px 12px";
+
+        if (styleName === "navy") {
+          if (isHeader) {
+            td.style.backgroundColor = "#1f497d";
+            td.style.color = "#ffffff";
+            td.style.border = "1px solid #17365d";
+            td.style.fontWeight = "bold";
+          } else {
+            td.style.backgroundColor = r % 2 === 0 ? "#f2f6fb" : "#ffffff";
+            td.style.color = "#000000";
+            td.style.border = "1px solid #cbd5e1";
+          }
+        } else if (styleName === "striped") {
+          if (isHeader) {
+            td.style.backgroundColor = "#334155";
+            td.style.color = "#ffffff";
+            td.style.border = "1px solid #1e293b";
+            td.style.fontWeight = "bold";
+          } else {
+            td.style.backgroundColor = r % 2 === 0 ? "#f8fafc" : "#ffffff";
+            td.style.color = "#000000";
+            td.style.border = "1px solid #e2e8f0";
+          }
+        } else if (styleName === "minimal") {
+          td.style.border = "none";
+          td.style.borderBottom = isHeader ? "2px solid #0f172a" : "1px solid #e2e8f0";
+          td.style.backgroundColor = "transparent";
+          td.style.color = "#000000";
+          if (isHeader) td.style.fontWeight = "bold";
+        } else if (styleName === "modern") {
+          if (isHeader) {
+            td.style.backgroundColor = "#0284c7";
+            td.style.color = "#ffffff";
+            td.style.border = "1px solid #0369a1";
+            td.style.fontWeight = "bold";
+          } else {
+            td.style.backgroundColor = r % 2 === 0 ? "#f0f9ff" : "#ffffff";
+            td.style.color = "#0f172a";
+            td.style.border = "1px solid #bae6fd";
+          }
+        } else {
+          // Classic Grid
+          td.style.backgroundColor = isHeader ? "#f1f5f9" : "#ffffff";
+          td.style.color = "#000000";
+          td.style.border = "1px solid #94a3b8";
+          if (isHeader) td.style.fontWeight = "bold";
+        }
+      }
+    }
+    setShowTableToolsMenu(false);
+    updateStats();
+    queueCollabSync();
+  };
+
+  // Special Indentation
+  const handleFirstLineIndent = () => {
+    const sel = window.getSelection();
+    if (!sel) return;
+    let node = sel.anchorNode;
+    while (node && node !== document.body) {
+      if (node instanceof HTMLElement && (node.tagName === "P" || node.tagName === "DIV")) {
+        node.style.textIndent = node.style.textIndent === "0.5in" ? "0" : "0.5in";
+        break;
+      }
+      node = node.parentNode;
+    }
+    updateStats();
+    queueCollabSync();
+  };
+
+  const handleHangingIndent = () => {
+    const sel = window.getSelection();
+    if (!sel) return;
+    let node = sel.anchorNode;
+    while (node && node !== document.body) {
+      if (node instanceof HTMLElement && (node.tagName === "P" || node.tagName === "DIV")) {
+        if (node.style.paddingLeft === "0.5in") {
+          node.style.paddingLeft = "0";
+          node.style.textIndent = "0";
+        } else {
+          node.style.paddingLeft = "0.5in";
+          node.style.textIndent = "-0.5in";
+        }
+        break;
+      }
+      node = node.parentNode;
+    }
+    updateStats();
+    queueCollabSync();
+  };
+
+  // Space Before & After Paragraph
+  const handleParagraphSpacing = (type: "before" | "after", action: "add" | "remove") => {
+    const sel = window.getSelection();
+    if (!sel) return;
+    let node = sel.anchorNode;
+    while (node && node !== document.body) {
+      if (node instanceof HTMLElement && (node.tagName === "P" || node.tagName === "DIV")) {
+        if (type === "before") {
+          node.style.marginTop = action === "add" ? "12pt" : "0";
+        } else {
+          node.style.marginBottom = action === "add" ? "12pt" : "0";
+        }
+        break;
+      }
+      node = node.parentNode;
+    }
+    updateStats();
+    queueCollabSync();
+  };
+
+  // Paragraph Borders
+  const handleParagraphBorder = (borderType: "bottom" | "top" | "box" | "left" | "none") => {
+    const sel = window.getSelection();
+    if (!sel) return;
+    let node = sel.anchorNode;
+    while (node && node !== document.body) {
+      if (node instanceof HTMLElement && (node.tagName === "P" || node.tagName === "DIV" || node.tagName === "BLOCKQUOTE")) {
+        if (borderType === "none") {
+          node.style.border = "none";
+          node.style.padding = "0";
+        } else if (borderType === "bottom") {
+          node.style.border = "none";
+          node.style.borderBottom = "2px solid #2b579a";
+          node.style.paddingBottom = "4px";
+        } else if (borderType === "top") {
+          node.style.border = "none";
+          node.style.borderTop = "2px solid #2b579a";
+          node.style.paddingTop = "4px";
+        } else if (borderType === "box") {
+          node.style.border = "1px solid #94a3b8";
+          node.style.borderRadius = "4px";
+          node.style.padding = "8px 12px";
+        } else if (borderType === "left") {
+          node.style.border = "none";
+          node.style.borderLeft = "4px solid #2563eb";
+          node.style.paddingLeft = "12px";
+        }
+        break;
+      }
+      node = node.parentNode;
+    }
+    setShowBorderMenu(false);
+    updateStats();
+    queueCollabSync();
+  };
+
+  // Text Typography Effects
+  const handleTextEffect = (effect: "shadow" | "gradient" | "smallcaps") => {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
+      alert("Please select some text first to apply text effects.");
+      return;
+    }
+    const range = sel.getRangeAt(0);
+    const span = document.createElement("span");
+    if (effect === "shadow") {
+      span.style.textShadow = "0 2px 4px rgba(0,0,0,0.35)";
+      span.style.fontWeight = "700";
+    } else if (effect === "gradient") {
+      span.style.background = "linear-gradient(135deg, #1e3a8a, #0284c7)";
+      span.style.webkitBackgroundClip = "text";
+      span.style.webkitTextFillColor = "transparent";
+      span.style.fontWeight = "bold";
+    } else if (effect === "smallcaps") {
+      span.style.fontVariant = "small-caps";
+      span.style.letterSpacing = "0.5px";
+    }
+    span.appendChild(range.extractContents());
+    range.insertNode(span);
+    setShowTextEffectsMenu(false);
+    updateStats();
+    queueCollabSync();
+  };
+
+  // Insert Pull Quote
+  const handleInsertPullQuote = () => {
+    const html = `
+      <blockquote style="margin: 20pt 0; padding: 12pt 24pt; border-top: 2px solid #1f497d; border-bottom: 2px solid #1f497d; font-family: 'Calibri Light', serif; font-size: 14pt; font-style: italic; color: #1f497d; text-align: center;">
+        “Insert your key pull quote or executive takeaway message here.”
+      </blockquote><p><br></p>
+    `;
+    exec("insertHTML", html);
+  };
+
+  // Insert Horizontal Rule / Divider
+  const handleInsertHorizontalRule = () => {
+    exec("insertHTML", `<hr style="border:none; border-top:1px solid #cbd5e1; margin:18pt 0;" /><p><br></p>`);
+  };
+
+  // Insert Interactive Checklist
+  const handleInsertChecklist = () => {
+    exec("insertHTML", `<p style="display:flex; align-items:center; gap:8px; margin: 4pt 0;"><input type="checkbox" style="width:16px; height:16px; cursor:pointer;" /> <span>Action item / task description...</span></p><p><br></p>`);
+  };
+
+  // Insert Footnote Reference
+  const handleInsertFootnote = () => {
+    const fnNum = Math.floor(Math.random() * 90 + 10);
+    exec("insertHTML", `<sup>[${fnNum}]</sup>`);
+    const activePage = pageRefs.current[activePageIndex] || pageRefs.current[0];
+    if (activePage) {
+      activePage.innerHTML += `<div style="font-size:9pt; color:#64748b; border-top:1px solid #e2e8f0; margin-top:20pt; padding-top:4pt;">[${fnNum}] Footnote note source citation...</div>`;
+      updateStats();
+      queueCollabSync();
+    }
+  };
+
+  // Scroll to Heading from Navigation Pane
+  const scrollToHeading = (id: string, pageIdx: number) => {
+    setActivePageIndex(pageIdx);
+    setTimeout(() => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.classList.add("ring-2", "ring-blue-500", "rounded", "p-0.5");
+        setTimeout(() => el.classList.remove("ring-2", "ring-blue-500", "rounded", "p-0.5"), 1500);
+      }
+    }, 50);
+  };
+
+  // Flesch-Kincaid Proofing Calculation
+  const calculateReadability = () => {
+    let totalWords = 0;
+    let totalSentences = 0;
+    let totalSyllables = 0;
+
+    pages.forEach((_, i) => {
+      const el = pageRefs.current[i];
+      const text = el ? (el.innerText || "") : "";
+      if (!text.trim()) return;
+
+      const words = text.match(/\b[A-Za-z]+\b/g) || [];
+      totalWords += words.length;
+
+      const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
+      totalSentences += Math.max(1, sentences.length);
+
+      words.forEach(word => {
+        const lower = word.toLowerCase();
+        const matches = lower.match(/[aeiouy]{1,2}/g);
+        let count = matches ? matches.length : 1;
+        if (lower.endsWith("e") && !lower.endsWith("le") && count > 1) count--;
+        totalSyllables += Math.max(1, count);
+      });
+    });
+
+    if (totalWords === 0) return { score: 100, level: "N/A", readingMinutes: 0, speakingMinutes: 0, sentences: 0, wordsPerSentence: "0" };
+
+    const wordsPerSentence = totalWords / Math.max(1, totalSentences);
+    const syllablesPerWord = totalSyllables / Math.max(1, totalWords);
+    const fleschScore = Math.max(0, Math.min(100, Math.round(206.835 - (1.015 * wordsPerSentence) - (84.6 * syllablesPerWord))));
+
+    let level = "College Graduate (Difficult)";
+    if (fleschScore >= 90) level = "5th Grade (Very Easy)";
+    else if (fleschScore >= 80) level = "6th Grade (Easy)";
+    else if (fleschScore >= 70) level = "7th Grade (Fairly Easy)";
+    else if (fleschScore >= 60) level = "8th - 9th Grade (Standard)";
+    else if (fleschScore >= 50) level = "10th - 12th Grade (Fairly Difficult)";
+    else if (fleschScore >= 30) level = "College Level (Difficult)";
+
+    return {
+      score: fleschScore,
+      level,
+      words: totalWords,
+      sentences: totalSentences,
+      syllables: totalSyllables,
+      wordsPerSentence: wordsPerSentence.toFixed(1),
+      readingMinutes: Math.max(1, Math.ceil(totalWords / 200)),
+      speakingMinutes: Math.max(1, Math.ceil(totalWords / 130))
+    };
+  };
+
   // Insert Link
   const handleInsertLink = () => {
     const url = prompt("Enter hyperlink URL (e.g. https://example.com):");
@@ -1112,6 +1577,13 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
     if (pageBgColor === "cream") return "bg-[#faf8f0] text-gray-900 border-[#eae4d3] shadow-xl";
     if (pageBgColor === "sepia") return "bg-[#f4ecd8] text-[#5c4b37] border-[#e2d5bc] shadow-xl";
     return "bg-white text-gray-900 border-gray-200/90 shadow-2xl";
+  };
+
+  const getPageBorderClasses = () => {
+    if (pageBorderStyle === "box") return "border-2 border-gray-900 dark:border-slate-300 shadow-md";
+    if (pageBorderStyle === "double") return "border-4 border-double border-[#1f497d] shadow-md";
+    if (pageBorderStyle === "shadow") return "border border-gray-300 dark:border-slate-700 shadow-2xl";
+    return "border border-gray-200/90 shadow-md hover:shadow-lg";
   };
 
   return (
@@ -1735,6 +2207,56 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
                   </div>
                 )}
               </div>
+
+              {/* Text Effects & Typography Menu (Word 365 Style) */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowTextEffectsMenu(!showTextEffectsMenu)}
+                  className="p-1.5 hover:bg-gray-100 dark:hover:bg-slate-800 rounded flex items-center text-xs"
+                  title="Text Effects and Typography (Shadow, Gradient, Small Caps)"
+                >
+                  <Sparkles className="w-4 h-4 text-cyan-500" />
+                  <ChevronDown className="w-3 h-3 text-gray-500" />
+                </button>
+                {showTextEffectsMenu && (
+                  <>
+                    <div className="fixed inset-0 z-40 cursor-default" onClick={() => setShowTextEffectsMenu(false)} />
+                    <div className="absolute top-full left-0 mt-1 w-48 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl shadow-2xl py-1 z-50">
+                      <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">Word Typography</div>
+                      <button
+                        type="button"
+                        onClick={() => handleTextEffect("shadow")}
+                        className="w-full text-left px-3 py-2 text-xs hover:bg-gray-100 dark:hover:bg-slate-800 flex items-center gap-2"
+                      >
+                        <span style={{ textShadow: "0 2px 4px rgba(0,0,0,0.4)", fontWeight: "bold" }}>Drop Shadow</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleTextEffect("gradient")}
+                        className="w-full text-left px-3 py-2 text-xs hover:bg-gray-100 dark:hover:bg-slate-800 flex items-center gap-2"
+                      >
+                        <span className="font-bold bg-gradient-to-r from-blue-700 to-cyan-500 bg-clip-text text-transparent">Word Gradient</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleTextEffect("smallcaps")}
+                        className="w-full text-left px-3 py-2 text-xs hover:bg-gray-100 dark:hover:bg-slate-800 flex items-center gap-2"
+                      >
+                        <span style={{ fontVariant: "small-caps", letterSpacing: "1px", fontWeight: "600" }}>Small Caps (ABC)</span>
+                      </button>
+                      <div className="h-px bg-gray-100 dark:bg-slate-800 my-1" />
+                      <button
+                        type="button"
+                        onClick={handleClearFormatting}
+                        className="w-full text-left px-3 py-1.5 text-xs text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 flex items-center gap-2"
+                      >
+                        <span>Clear Typography Formats</span>
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
 
             {/* Paragraph Formatting (Bullets, Numbering, Checkbox, Align, Spacing, Shading, Borders) */}
@@ -1854,6 +2376,90 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
               >
                 <Palette className="w-4 h-4 text-indigo-500" />
               </button>
+
+              {/* Special Indents: First-Line & Hanging */}
+              <button
+                type="button"
+                onClick={handleFirstLineIndent}
+                className="px-1.5 py-1 hover:bg-gray-100 dark:hover:bg-slate-800 rounded text-xs font-semibold"
+                title="First-Line Indent (0.5 in for standard APA/MLA paragraphs)"
+              >
+                1st Indent
+              </button>
+              <button
+                type="button"
+                onClick={handleHangingIndent}
+                className="px-1.5 py-1 hover:bg-gray-100 dark:hover:bg-slate-800 rounded text-xs font-semibold"
+                title="Hanging Indent (0.5 in for references and bibliographies)"
+              >
+                Hanging
+              </button>
+
+              {/* Paragraph Spacing (+12pt Before / After) */}
+              <button
+                type="button"
+                onClick={() => handleParagraphSpacing("after", "add")}
+                className="p-1.5 hover:bg-gray-100 dark:hover:bg-slate-800 rounded text-xs font-semibold"
+                title="Add 12pt Space After Paragraph"
+              >
+                +12pt
+              </button>
+
+              {/* Paragraph Borders Dropdown */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowBorderMenu(!showBorderMenu)}
+                  className="p-1.5 hover:bg-gray-100 dark:hover:bg-slate-800 rounded flex items-center"
+                  title="Paragraph Borders (Bottom, Top, Box, Accent Line)"
+                >
+                  <Sliders className="w-4 h-4 text-gray-700 dark:text-gray-300" />
+                  <ChevronDown className="w-3 h-3 text-gray-500" />
+                </button>
+                {showBorderMenu && (
+                  <>
+                    <div className="fixed inset-0 z-40 cursor-default" onClick={() => setShowBorderMenu(false)} />
+                    <div className="absolute top-full left-0 mt-1 w-44 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl shadow-2xl py-1 z-50">
+                      <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">Borders</div>
+                      <button
+                        type="button"
+                        onClick={() => handleParagraphBorder("bottom")}
+                        className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-100 dark:hover:bg-slate-800 border-b border-gray-300 dark:border-slate-700"
+                      >
+                        Bottom Border
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleParagraphBorder("top")}
+                        className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-100 dark:hover:bg-slate-800 border-t border-gray-300 dark:border-slate-700"
+                      >
+                        Top Border
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleParagraphBorder("box")}
+                        className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-100 dark:hover:bg-slate-800"
+                      >
+                        Outside Box Border
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleParagraphBorder("left")}
+                        className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-100 dark:hover:bg-slate-800 border-l-4 border-blue-600 pl-2 ml-1"
+                      >
+                        Left Accent Line
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleParagraphBorder("none")}
+                        className="w-full text-left px-3 py-1.5 text-xs text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800"
+                      >
+                        No Border
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
 
             {/* Quick Styles Gallery */}
@@ -1939,6 +2545,131 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
               )}
             </div>
 
+            {/* Table Tools: Rows, Columns, Deletions, Themes on Home Tab */}
+            <div className="relative pr-2 border-r border-gray-200 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setShowTableToolsMenu(!showTableToolsMenu)}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded hover:bg-purple-50 dark:hover:bg-slate-800 border border-purple-200 dark:border-slate-700 bg-purple-50/60 dark:bg-slate-800/60 text-purple-700 dark:text-purple-300 font-semibold cursor-pointer"
+                title="Table Tools (Add/Delete Rows & Columns, Table Styles)"
+              >
+                <Rows className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                <span>Table Tools</span>
+                <ChevronDown className="w-3 h-3 text-gray-400" />
+              </button>
+
+              {showTableToolsMenu && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40 cursor-default"
+                    onClick={() => setShowTableToolsMenu(false)}
+                  />
+                  <div className="absolute top-full left-0 mt-1 w-56 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl shadow-2xl py-2 z-50 text-xs">
+                    <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">Rows & Columns</div>
+                    <button
+                      type="button"
+                      onClick={() => handleAddTableRow("above")}
+                      className="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-slate-800 flex items-center justify-between"
+                    >
+                      <span>Insert Row Above</span>
+                      <span className="text-[10px] text-gray-400">+Row ↑</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAddTableRow("below")}
+                      className="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-slate-800 flex items-center justify-between"
+                    >
+                      <span>Insert Row Below</span>
+                      <span className="text-[10px] text-gray-400">+Row ↓</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAddTableColumn("left")}
+                      className="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-slate-800 flex items-center justify-between"
+                    >
+                      <span>Insert Col Left</span>
+                      <span className="text-[10px] text-gray-400">+Col ←</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAddTableColumn("right")}
+                      className="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-slate-800 flex items-center justify-between"
+                    >
+                      <span>Insert Col Right</span>
+                      <span className="text-[10px] text-gray-400">+Col →</span>
+                    </button>
+
+                    <div className="h-px bg-gray-100 dark:bg-slate-800 my-1" />
+                    <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-red-500">Delete</div>
+                    <button
+                      type="button"
+                      onClick={handleDeleteTableRow}
+                      className="w-full text-left px-3 py-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
+                    >
+                      Delete Row
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDeleteTableColumn}
+                      className="w-full text-left px-3 py-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
+                    >
+                      Delete Column
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDeleteEntireTable}
+                      className="w-full text-left px-3 py-1.5 text-red-600 font-bold hover:bg-red-50 dark:hover:bg-red-950/30"
+                    >
+                      Delete Entire Table
+                    </button>
+
+                    <div className="h-px bg-gray-100 dark:bg-slate-800 my-1" />
+                    <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-blue-600">Table Themes</div>
+                    <button
+                      type="button"
+                      onClick={() => handleApplyTableStyle("navy")}
+                      className="w-full text-left px-3 py-1.5 hover:bg-blue-50 dark:hover:bg-slate-800 flex items-center gap-2"
+                    >
+                      <div className="w-3.5 h-3.5 rounded bg-[#1f497d]" />
+                      <span>Navy Blue Accent</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleApplyTableStyle("striped")}
+                      className="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-slate-800 flex items-center gap-2"
+                    >
+                      <div className="w-3.5 h-3.5 rounded bg-[#334155]" />
+                      <span>Alternating Striped</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleApplyTableStyle("modern")}
+                      className="w-full text-left px-3 py-1.5 hover:bg-sky-50 dark:hover:bg-slate-800 flex items-center gap-2"
+                    >
+                      <div className="w-3.5 h-3.5 rounded bg-[#0284c7]" />
+                      <span>Modern Sky Blue</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleApplyTableStyle("minimal")}
+                      className="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-slate-800 flex items-center gap-2"
+                    >
+                      <div className="w-3.5 h-3.5 rounded border border-gray-400 bg-white" />
+                      <span>Minimal Line</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleApplyTableStyle("classic")}
+                      className="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-slate-800 flex items-center gap-2"
+                    >
+                      <div className="w-3.5 h-3.5 rounded bg-gray-200 border border-gray-400" />
+                      <span>Classic Grid</span>
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+
             {/* Editing / Find & Replace */}
             <div className="flex items-center gap-1">
               <button
@@ -2012,6 +2743,131 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
               )}
             </div>
 
+            {/* Table Tools on Insert Tab */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowTableToolsMenu(!showTableToolsMenu)}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded hover:bg-purple-50 dark:hover:bg-slate-800 border border-purple-200 dark:border-slate-700 bg-purple-50/60 dark:bg-slate-800/60 text-purple-700 dark:text-purple-300 font-semibold cursor-pointer"
+                title="Table Tools (Add/Delete Rows & Columns, Table Styles)"
+              >
+                <Rows className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                <span>Table Tools</span>
+                <ChevronDown className="w-3 h-3 text-gray-400" />
+              </button>
+
+              {showTableToolsMenu && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40 cursor-default"
+                    onClick={() => setShowTableToolsMenu(false)}
+                  />
+                  <div className="absolute top-full left-0 mt-1 w-56 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl shadow-2xl py-2 z-50 text-xs">
+                    <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">Rows & Columns</div>
+                    <button
+                      type="button"
+                      onClick={() => handleAddTableRow("above")}
+                      className="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-slate-800 flex items-center justify-between"
+                    >
+                      <span>Insert Row Above</span>
+                      <span className="text-[10px] text-gray-400">+Row ↑</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAddTableRow("below")}
+                      className="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-slate-800 flex items-center justify-between"
+                    >
+                      <span>Insert Row Below</span>
+                      <span className="text-[10px] text-gray-400">+Row ↓</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAddTableColumn("left")}
+                      className="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-slate-800 flex items-center justify-between"
+                    >
+                      <span>Insert Col Left</span>
+                      <span className="text-[10px] text-gray-400">+Col ←</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAddTableColumn("right")}
+                      className="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-slate-800 flex items-center justify-between"
+                    >
+                      <span>Insert Col Right</span>
+                      <span className="text-[10px] text-gray-400">+Col →</span>
+                    </button>
+
+                    <div className="h-px bg-gray-100 dark:bg-slate-800 my-1" />
+                    <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-red-500">Delete</div>
+                    <button
+                      type="button"
+                      onClick={handleDeleteTableRow}
+                      className="w-full text-left px-3 py-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
+                    >
+                      Delete Row
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDeleteTableColumn}
+                      className="w-full text-left px-3 py-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
+                    >
+                      Delete Column
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDeleteEntireTable}
+                      className="w-full text-left px-3 py-1.5 text-red-600 font-bold hover:bg-red-50 dark:hover:bg-red-950/30"
+                    >
+                      Delete Entire Table
+                    </button>
+
+                    <div className="h-px bg-gray-100 dark:bg-slate-800 my-1" />
+                    <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-blue-600">Table Themes</div>
+                    <button
+                      type="button"
+                      onClick={() => handleApplyTableStyle("navy")}
+                      className="w-full text-left px-3 py-1.5 hover:bg-blue-50 dark:hover:bg-slate-800 flex items-center gap-2"
+                    >
+                      <div className="w-3.5 h-3.5 rounded bg-[#1f497d]" />
+                      <span>Navy Blue Accent</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleApplyTableStyle("striped")}
+                      className="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-slate-800 flex items-center gap-2"
+                    >
+                      <div className="w-3.5 h-3.5 rounded bg-[#334155]" />
+                      <span>Alternating Striped</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleApplyTableStyle("modern")}
+                      className="w-full text-left px-3 py-1.5 hover:bg-sky-50 dark:hover:bg-slate-800 flex items-center gap-2"
+                    >
+                      <div className="w-3.5 h-3.5 rounded bg-[#0284c7]" />
+                      <span>Modern Sky Blue</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleApplyTableStyle("minimal")}
+                      className="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-slate-800 flex items-center gap-2"
+                    >
+                      <div className="w-3.5 h-3.5 rounded border border-gray-400 bg-white" />
+                      <span>Minimal Line</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleApplyTableStyle("classic")}
+                      className="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-slate-800 flex items-center gap-2"
+                    >
+                      <div className="w-3.5 h-3.5 rounded bg-gray-200 border border-gray-400" />
+                      <span>Classic Grid</span>
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+
             {/* Picture Upload */}
             <button
               type="button"
@@ -2041,6 +2897,17 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
               <span>Link</span>
             </button>
 
+            {/* Pull Quote */}
+            <button
+              type="button"
+              onClick={handleInsertPullQuote}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded hover:bg-gray-100 dark:hover:bg-slate-800 border border-gray-200 dark:border-slate-700"
+              title="Insert Pull Quote"
+            >
+              <Quote className="w-4 h-4 text-indigo-500" />
+              <span>Pull Quote</span>
+            </button>
+
             {/* Callout Box */}
             <button
               type="button"
@@ -2050,6 +2917,39 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
             >
               <FileText className="w-4 h-4 text-amber-500" />
               <span>Callout Box</span>
+            </button>
+
+            {/* Horizontal Line Divider */}
+            <button
+              type="button"
+              onClick={handleInsertHorizontalRule}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded hover:bg-gray-100 dark:hover:bg-slate-800 border border-gray-200 dark:border-slate-700"
+              title="Insert Horizontal Divider Line"
+            >
+              <Minus className="w-4 h-4 text-slate-500" />
+              <span>Horizontal Line</span>
+            </button>
+
+            {/* Checklist Item */}
+            <button
+              type="button"
+              onClick={handleInsertChecklist}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded hover:bg-gray-100 dark:hover:bg-slate-800 border border-gray-200 dark:border-slate-700"
+              title="Insert Checklist Item"
+            >
+              <CheckSquare className="w-4 h-4 text-emerald-500" />
+              <span>Checklist</span>
+            </button>
+
+            {/* Footnote Citation */}
+            <button
+              type="button"
+              onClick={handleInsertFootnote}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded hover:bg-gray-100 dark:hover:bg-slate-800 border border-gray-200 dark:border-slate-700"
+              title="Insert Footnote Citation"
+            >
+              <BookOpen className="w-4 h-4 text-amber-600" />
+              <span>Footnote</span>
             </button>
 
             {/* Page Break */}
@@ -2176,6 +3076,61 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
               </select>
             </div>
 
+            {/* Page Borders */}
+            <div className="flex items-center gap-1">
+              <span className="text-gray-500 font-semibold">Page Border:</span>
+              <select
+                value={pageBorderStyle}
+                onChange={(e) => setPageBorderStyle(e.target.value as any)}
+                className="h-8 px-2 rounded border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-medium outline-none"
+              >
+                <option value="none">None</option>
+                <option value="box">Solid Box</option>
+                <option value="double">Double Navy Line</option>
+                <option value="shadow">Drop Shadow Box</option>
+              </select>
+            </div>
+
+            {/* Running Header */}
+            <div className="flex items-center gap-1">
+              <span className="text-gray-500 font-semibold">Header:</span>
+              <input
+                type="text"
+                value={runningHeaderText}
+                onChange={(e) => setRunningHeaderText(e.target.value)}
+                placeholder="Document header..."
+                className="h-8 px-2 rounded border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-medium outline-none w-28 sm:w-36"
+                title="Running document header text across all pages"
+              />
+            </div>
+
+            {/* Running Footer */}
+            <div className="flex items-center gap-1">
+              <span className="text-gray-500 font-semibold">Footer:</span>
+              <input
+                type="text"
+                value={runningFooterText}
+                onChange={(e) => setRunningFooterText(e.target.value)}
+                placeholder="Document footer..."
+                className="h-8 px-2 rounded border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-medium outline-none w-28 sm:w-36"
+                title="Running document footer text across all pages"
+              />
+            </div>
+
+            {/* Page Number Format */}
+            <div className="flex items-center gap-1">
+              <span className="text-gray-500 font-semibold">Numbering:</span>
+              <select
+                value={pageNumberFormat}
+                onChange={(e) => setPageNumberFormat(e.target.value as any)}
+                className="h-8 px-2 rounded border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-medium outline-none"
+              >
+                <option value="standard">Page 1 of N</option>
+                <option value="compact">1 / N</option>
+                <option value="hash">#1</option>
+              </select>
+            </div>
+
             {/* Watermark */}
             <div className="flex items-center gap-1">
               <span className="text-gray-500 font-semibold">Watermark:</span>
@@ -2191,6 +3146,17 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
                 <option value="DO NOT COPY">DO NOT COPY</option>
               </select>
             </div>
+
+            {/* Hyphenation */}
+            <label className="flex items-center gap-1.5 cursor-pointer text-xs font-semibold select-none">
+              <input
+                type="checkbox"
+                checked={hyphenation}
+                onChange={(e) => setHyphenation(e.target.checked)}
+                className="rounded"
+              />
+              <span>Hyphenation</span>
+            </label>
           </div>
         )}
 
@@ -2200,10 +3166,18 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
             <button
               type="button"
               onClick={() => setShowStatsModal(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 font-semibold border border-gray-300 dark:border-slate-700"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 font-semibold border border-gray-300 dark:border-slate-700 cursor-pointer"
             >
               <BarChart3 className="w-4 h-4 text-blue-600" />
               <span>Word Count & Document Stats</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowProofingModal(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/60 font-semibold border border-blue-300 dark:border-blue-800 cursor-pointer"
+            >
+              <Sparkles className="w-4 h-4 text-blue-600" />
+              <span>Proofing & Readability Score</span>
             </button>
             <div className="text-xs text-gray-500 flex items-center gap-3">
               <span><strong>{wordCount}</strong> words</span>
@@ -2248,8 +3222,28 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
               </button>
             </div>
 
+            {/* Navigation Pane Toggle */}
+            <button
+              type="button"
+              onClick={() => setShowNavPane(!showNavPane)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold border transition cursor-pointer ${
+                showNavPane
+                  ? "bg-blue-600 text-white border-blue-600 shadow-sm"
+                  : "hover:bg-gray-100 dark:hover:bg-slate-800 border-gray-300 dark:border-slate-700"
+              }`}
+              title="Navigation Pane (Headings Tree)"
+            >
+              <PanelLeft className="w-4 h-4" />
+              <span>Navigation Pane</span>
+              {headingsList.length > 0 && (
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${showNavPane ? "bg-white/25 text-white" : "bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300"}`}>
+                  {headingsList.length}
+                </span>
+              )}
+            </button>
+
             {/* Show/Hide Ruler */}
-            <label className="flex items-center gap-1.5 cursor-pointer text-xs font-semibold">
+            <label className="flex items-center gap-1.5 cursor-pointer text-xs font-semibold select-none">
               <input
                 type="checkbox"
                 checked={showRuler}
@@ -2366,88 +3360,154 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
       )}
 
       {/* 5. Document Scrollable Workspace & Paginated Paper Sheets */}
-      <div
-        className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-8 flex flex-col items-center justify-start cursor-default bg-[#f3f4f6] dark:bg-[#09090b]"
-        onClick={handleApplyFormatPainter}
-      >
+      <div className="flex-1 flex overflow-hidden">
+        {/* Navigation Pane Drawer (Word Style Headings Outline) */}
+        {showNavPane && (
+          <div className="w-64 bg-white dark:bg-slate-900 border-r border-gray-200 dark:border-slate-800 flex flex-col h-full shrink-0 shadow-md animate-fade-in z-20">
+            <div className="p-3 border-b border-gray-200 dark:border-slate-800 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <PanelLeft className="w-4 h-4 text-blue-600" />
+                <span className="font-bold text-xs text-gray-800 dark:text-gray-200">Headings Outline</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowNavPane(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-0.5 cursor-pointer"
+                title="Close Navigation Pane"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-2 space-y-1">
+              {headingsList.length === 0 ? (
+                <div className="p-4 text-center text-xs text-gray-400 dark:text-gray-500">
+                  <BookOpen className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                  <p className="font-semibold mb-1">No Headings Found</p>
+                  <p className="text-[11px]">Apply Heading 1 or Heading 2 styles to create your document outline.</p>
+                </div>
+              ) : (
+                headingsList.map((h) => (
+                  <button
+                    key={h.id}
+                    type="button"
+                    onClick={() => scrollToHeading(h.id, h.pageIdx)}
+                    className={`w-full text-left px-2.5 py-1.5 rounded hover:bg-blue-50 dark:hover:bg-slate-800 text-xs transition cursor-pointer truncate ${
+                      h.level === 1
+                        ? "font-bold text-gray-900 dark:text-white"
+                        : h.level === 2
+                        ? "font-semibold text-gray-700 dark:text-gray-300 pl-4"
+                        : "text-gray-600 dark:text-gray-400 pl-6 text-[11px]"
+                    }`}
+                    title={h.text}
+                  >
+                    <span className="text-[10px] text-gray-400 mr-1.5">p.{h.pageIdx + 1}</span>
+                    <span>{h.text}</span>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Paper Sheets Scroll Area */}
         <div
-          style={{ zoom: `${zoom}%` }}
-          className="w-full flex flex-col items-center"
+          className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-8 flex flex-col items-center justify-start cursor-default bg-[#f3f4f6] dark:bg-[#09090b]"
+          onClick={handleApplyFormatPainter}
         >
-          {pages.map((pageHtml, index) => (
-            <div
-              key={index}
-              onClick={() => setActivePageIndex(index)}
-              className={`word-page-sheet w-full ${getPageWidthClass()} ${getPaperBg()} ${getMarginClass()} rounded-xs relative transition-all shadow-md hover:shadow-lg mx-auto mb-8 focus-within:ring-2 focus-within:ring-blue-500/50`}
-              style={{
-                minHeight: "1056px",
-                fontFamily: fontFamily,
-                columnCount: columns !== "1" ? columns : undefined,
-                columnGap: "32px"
-              }}
-            >
-              {/* Watermark (if set) */}
-              {watermark && (
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0">
-                  <span className="text-gray-200/50 dark:text-slate-800/60 font-black text-6xl sm:text-8xl tracking-widest -rotate-45 uppercase">
-                    {watermark}
+          <div
+            style={{ zoom: `${zoom}%` }}
+            className="w-full flex flex-col items-center"
+          >
+            {pages.map((pageHtml, index) => (
+              <div
+                key={index}
+                onClick={() => setActivePageIndex(index)}
+                className={`word-page-sheet w-full ${getPageWidthClass()} ${getPaperBg()} ${getPageBorderClasses()} ${getMarginClass()} rounded-xs relative transition-all mx-auto mb-8 focus-within:ring-2 focus-within:ring-blue-500/50`}
+                style={{
+                  minHeight: "1056px",
+                  fontFamily: fontFamily,
+                  columnCount: columns !== "1" ? columns : undefined,
+                  columnGap: "32px"
+                }}
+              >
+                {/* Watermark (if set) */}
+                {watermark && (
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0">
+                    <span className="text-gray-200/50 dark:text-slate-800/60 font-black text-6xl sm:text-8xl tracking-widest -rotate-45 uppercase">
+                      {watermark}
+                    </span>
+                  </div>
+                )}
+
+                {/* Page Header (Word Style) */}
+                <div className="flex items-center justify-between pb-2 mb-4 border-b border-gray-200 dark:border-slate-800 text-[11px] text-gray-400 select-none">
+                  <span className="font-medium truncate max-w-[240px]">{runningHeaderText || title || "Word Document"}</span>
+                  <div className="flex items-center gap-3">
+                    <span className="font-semibold text-gray-500 dark:text-gray-400">
+                      {pageNumberFormat === "compact"
+                        ? `${index + 1} / ${pages.length}`
+                        : pageNumberFormat === "hash"
+                        ? `#${index + 1}`
+                        : `Page ${index + 1} of ${pages.length}`}
+                    </span>
+                    {pages.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeletePage(index);
+                        }}
+                        className="hover:text-red-600 dark:hover:text-red-400 transition px-2 py-0.5 rounded text-[10px] font-medium bg-gray-100 dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-950/40 cursor-pointer"
+                        title={`Delete Page ${index + 1}`}
+                      >
+                        Delete Page
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Editable Page Body Canvas */}
+                <div
+                  ref={(el) => { pageRefs.current[index] = el; }}
+                  contentEditable
+                  onInput={() => handlePageInput(index)}
+                  onFocus={() => setActivePageIndex(index)}
+                  onKeyDown={(e) => handlePageKeyDown(e, index)}
+                  data-placeholder={index === 0 ? "Start typing your Word document here..." : `Continue typing on Page ${index + 1}...`}
+                  className="word-editor-canvas outline-none min-h-[920px] empty:before:content-[attr(data-placeholder)] empty:before:text-gray-400 dark:empty:before:text-gray-600 relative z-10"
+                  style={{
+                    fontSize: `${fontSize}pt`,
+                    lineHeight: lineSpacing,
+                    hyphens: hyphenation ? "auto" : "manual"
+                  }}
+                />
+
+                {/* Page Footer (Word Style) */}
+                <div className="flex items-center justify-between pt-3 mt-4 border-t border-gray-200 dark:border-slate-800 text-[11px] text-gray-400 select-none">
+                  <span className="truncate max-w-[240px] italic">{runningFooterText || ""}</span>
+                  <span>
+                    {pageNumberFormat === "compact"
+                      ? `${index + 1} / ${pages.length}`
+                      : pageNumberFormat === "hash"
+                      ? `#${index + 1}`
+                      : `Page ${index + 1} of ${pages.length}`}
                   </span>
                 </div>
-              )}
-
-              {/* Page Header (Word Style) */}
-              <div className="flex items-center justify-between pb-2 mb-4 border-b border-gray-200 dark:border-slate-800 text-[11px] text-gray-400 select-none">
-                <span className="font-medium truncate max-w-[240px]">{title || "Word Document"}</span>
-                <div className="flex items-center gap-3">
-                  <span className="font-semibold text-gray-500 dark:text-gray-400">Page {index + 1} of {pages.length}</span>
-                  {pages.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeletePage(index);
-                      }}
-                      className="hover:text-red-600 dark:hover:text-red-400 transition px-2 py-0.5 rounded text-[10px] font-medium bg-gray-100 dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-950/40"
-                      title={`Delete Page ${index + 1}`}
-                    >
-                      Delete Page
-                    </button>
-                  )}
-                </div>
               </div>
+            ))}
 
-              {/* Editable Page Body Canvas */}
-              <div
-                ref={(el) => { pageRefs.current[index] = el; }}
-                contentEditable
-                onInput={() => handlePageInput(index)}
-                onFocus={() => setActivePageIndex(index)}
-                onKeyDown={(e) => handlePageKeyDown(e, index)}
-                data-placeholder={index === 0 ? "Start typing your Word document here..." : `Continue typing on Page ${index + 1}...`}
-                className="word-editor-canvas outline-none min-h-[920px] empty:before:content-[attr(data-placeholder)] empty:before:text-gray-400 dark:empty:before:text-gray-600 relative z-10"
-                style={{
-                  fontSize: `${fontSize}pt`,
-                  lineHeight: lineSpacing
-                }}
-              />
-
-              {/* Page Footer (Word Style) */}
-              <div className="flex items-center justify-center pt-3 mt-4 border-t border-gray-200 dark:border-slate-800 text-[11px] text-gray-400 select-none">
-                <span>Page {index + 1} of {pages.length}</span>
-              </div>
+            {/* Quick Add Page Gutter Action */}
+            <div className="flex items-center justify-center my-3 select-none">
+              <button
+                type="button"
+                onClick={() => handleAddPage(pages.length)}
+                className="px-4 py-2 rounded-lg border border-dashed border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:border-blue-500 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition shadow-sm flex items-center gap-2 cursor-pointer"
+              >
+                <span className="text-base font-bold leading-none">+</span>
+                <span>Insert Page {pages.length + 1}</span>
+              </button>
             </div>
-          ))}
-
-          {/* Quick Add Page Gutter Action */}
-          <div className="flex items-center justify-center my-3 select-none">
-            <button
-              type="button"
-              onClick={() => handleAddPage(pages.length)}
-              className="px-4 py-2 rounded-lg border border-dashed border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:border-blue-500 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition shadow-sm flex items-center gap-2 cursor-pointer"
-            >
-              <span className="text-base font-bold leading-none">+</span>
-              <span>Insert Page {pages.length + 1}</span>
-            </button>
           </div>
         </div>
       </div>
@@ -2582,6 +3642,86 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
           </div>
         </div>
       )}
+
+      {/* Proofing & Readability Statistics Modal */}
+      {showProofingModal && (() => {
+        const stats = calculateReadability();
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
+            <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl relative">
+              <button
+                type="button"
+                onClick={() => setShowProofingModal(false)}
+                className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              <div className="flex items-center gap-2 mb-4">
+                <Sparkles className="w-5 h-5 text-blue-600" />
+                <h3 className="font-bold text-base text-gray-900 dark:text-white">Proofing & Readability</h3>
+              </div>
+
+              {/* Flesch Reading Score Gauge */}
+              <div className="p-4 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/60 mb-4 text-center">
+                <div className="text-[11px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300 mb-1">
+                  Flesch Reading Ease Score
+                </div>
+                <div className="text-4xl font-black text-blue-900 dark:text-blue-100 mb-1">
+                  {stats.score} <span className="text-sm font-normal text-gray-500">/ 100</span>
+                </div>
+                <div className="w-full bg-gray-200 dark:bg-slate-700 h-2.5 rounded-full overflow-hidden mb-2">
+                  <div
+                    className={`h-full transition-all duration-500 ${
+                      stats.score >= 70
+                        ? "bg-emerald-500"
+                        : stats.score >= 50
+                        ? "bg-blue-500"
+                        : stats.score >= 30
+                        ? "bg-amber-500"
+                        : "bg-rose-500"
+                    }`}
+                    style={{ width: `${Math.min(100, Math.max(5, stats.score))}%` }}
+                  />
+                </div>
+                <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                  Grade Level: <strong>{stats.level}</strong>
+                </span>
+              </div>
+
+              {/* Detailed Metrics */}
+              <div className="space-y-2 text-xs text-gray-700 dark:text-gray-300">
+                <div className="flex justify-between py-1 border-b border-gray-100 dark:border-slate-800">
+                  <span>Total Sentences</span>
+                  <span className="font-bold">{stats.sentences}</span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-gray-100 dark:border-slate-800">
+                  <span>Words Per Sentence (Avg)</span>
+                  <span className="font-bold">{stats.wordsPerSentence}</span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-gray-100 dark:border-slate-800">
+                  <span>Estimated Silent Reading Time (200 wpm)</span>
+                  <span className="font-bold">{stats.readingMinutes} min</span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-gray-100 dark:border-slate-800">
+                  <span>Estimated Speaking / Presentation Time (130 wpm)</span>
+                  <span className="font-bold">{stats.speakingMinutes} min</span>
+                </div>
+              </div>
+
+              <div className="mt-5 pt-3 border-t border-gray-100 dark:border-slate-800 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowProofingModal(false)}
+                  className="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-xs cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Word Collab (Start / Join) Modal */}
       {showCollabModal && (

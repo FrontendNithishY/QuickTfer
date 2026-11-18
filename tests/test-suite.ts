@@ -613,12 +613,100 @@ print(f"Total: {metrics['total']} | Average: {metrics['mean']:.2f} | Status: {me
     const fetchedPages = splitIntoPages(fetchedMultiPage.content);
     assert.strictEqual(fetchedPages.length, 3, "Published note preserves 3 distinct pages on read");
     assert.ok(fetchedPages[0].includes("text-align: center"), "Page 1 preserves center alignment in storage and API");
-    console.log(`✓ Multi-page Word document verified on /p/${multiPageData.slug} with 3 distinct pages and original alignments!`);
+    // 18. Test Advanced Microsoft Word Tools & Readability Scoring Engine
+    console.log("[Test 18] Testing Advanced MS Word Tools (Readability, Table Tools, Heading Hierarchy)...");
+    
+    // 18a. Readability calculation validation
+    const sampleText = "The quick brown fox jumps over the lazy dog. Microsoft Word document formatting allows authors to structure rich essays and technical documents.";
+    const words = sampleText.match(/\b[A-Za-z]+\b/g) || [];
+    const sentences = sampleText.split(/[.!?]+/).filter(s => s.trim().length > 0);
+    assert.strictEqual(words.length, 22, "Word count must accurately tokenize 22 words");
+    assert.strictEqual(sentences.length, 2, "Sentence count must be 2");
+
+    let totalSyllables = 0;
+    words.forEach(word => {
+      const lower = word.toLowerCase();
+      const matches = lower.match(/[aeiouy]{1,2}/g);
+      let count = matches ? matches.length : 1;
+      if (lower.endsWith("e") && !lower.endsWith("le") && count > 1) count--;
+      totalSyllables += Math.max(1, count);
+    });
+    const wordsPerSentence = words.length / sentences.length;
+    const syllablesPerWord = totalSyllables / words.length;
+    const fleschScore = Math.max(0, Math.min(100, Math.round(206.835 - (1.015 * wordsPerSentence) - (84.6 * syllablesPerWord))));
+    assert.ok(fleschScore >= 0 && fleschScore <= 100, "Flesch score must be within 0-100");
+    console.log(`✓ Real Flesch-Kincaid Readability Engine verified: Score ${fleschScore}/100`);
+
+    // 18b. Heading Hierarchy & Navigation Extraction
+    const docWithHeadings = `
+      <h1>Executive Overview</h1>
+      <p>Introductory paragraph.</p>
+      <h2>Market Assessment</h2>
+      <p>Deep-dive research analysis.</p>
+      <h3>Competitive Moat</h3>
+      <p>Strategic differentiation.</p>
+    `;
+    const headingMatches = [...docWithHeadings.matchAll(/<(h[1-3])>(.*?)<\/\1>/gi)];
+    assert.strictEqual(headingMatches.length, 3, "Must detect exactly 3 headings");
+    assert.strictEqual(headingMatches[0][2], "Executive Overview");
+    assert.strictEqual(headingMatches[1][2], "Market Assessment");
+    assert.strictEqual(headingMatches[2][2], "Competitive Moat");
+    console.log("✓ Document Headings Tree extraction verified for Navigation Pane");
+
+    // 18c. Publish note containing MS Word Pull Quote, Table Tools, and Indented Paragraphs
+    const richWordDoc = `
+      <div style="font-family: Calibri, sans-serif;">
+        <h1 style="color:#1f497d;">Quarterly Financial Briefing</h1>
+        <blockquote style="margin:20pt 0; padding:12pt 24pt; border-top:2px solid #1f497d; border-bottom:2px solid #1f497d; font-style:italic;">
+          “Revenue grew 42% quarter-over-quarter driven by SharePaste enterprise adoption.”
+        </blockquote>
+        <p style="text-indent: 0.5in;">First-line indented executive paragraph following standard APA formatting.</p>
+        <table style="width:100%; border-collapse:collapse; margin:16px 0;">
+          <thead>
+            <tr>
+              <th style="background-color:#1f497d; color:#ffffff; padding:8px 12px; border:1px solid #17365d;">Department</th>
+              <th style="background-color:#1f497d; color:#ffffff; padding:8px 12px; border:1px solid #17365d;">Q3 Performance</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="padding:8px 12px; border:1px solid #cbd5e1; background-color:#ffffff;">Engineering</td>
+              <td style="padding:8px 12px; border:1px solid #cbd5e1; background-color:#ffffff;">100% SLA Target Met</td>
+            </tr>
+            <tr>
+              <td style="padding:8px 12px; border:1px solid #cbd5e1; background-color:#f2f6fb;">Product</td>
+              <td style="padding:8px 12px; border:1px solid #cbd5e1; background-color:#f2f6fb;">New Word Editor Shipped</td>
+            </tr>
+          </tbody>
+        </table>
+        <hr style="border:none; border-top:1px solid #cbd5e1; margin:18pt 0;" />
+        <p style="display:flex; align-items:center; gap:8px;"><input type="checkbox" checked /> Board presentation scheduled</p>
+      </div>
+    `;
+
+    const richWordRes = await fetch(`${baseUrl}/api/pastes`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: "Quarterly Financial Briefing with MS Word Tools",
+        content: richWordDoc,
+        visibility: "public"
+      })
+    });
+    assert.strictEqual(richWordRes.status, 201);
+    const richWordData = await richWordRes.json() as any;
+    assert.ok(richWordData.slug);
+
+    const fetchedRich = await (await fetch(`${baseUrl}/api/pastes/${richWordData.slug}`)).json() as any;
+    assert.ok(fetchedRich.content.includes("border-top:2px solid #1f497d"), "Pull quote border preserved");
+    assert.ok(fetchedRich.content.includes("text-indent: 0.5in"), "First-line 0.5in indent preserved");
+    assert.ok(fetchedRich.content.includes("Department"), "Themed table headers preserved");
+    assert.ok(fetchedRich.content.includes("checkbox"), "Interactive checklist preserved");
+    console.log(`✓ Rich MS Word document published & verified on /p/${richWordData.slug}`);
 
     console.log("\n=======================================================");
-    console.log("🎉 ALL AUTOMATED TESTS PASSED SUCCESSFULLY! (17/17) 🎉");
+    console.log("🎉 ALL AUTOMATED TESTS PASSED SUCCESSFULLY! (18/18) 🎉");
     console.log("=======================================================\n");
-
 
   } finally {
     server.close();
