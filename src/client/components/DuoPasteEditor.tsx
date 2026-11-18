@@ -467,7 +467,7 @@ export const DuoPasteEditor: React.FC<DuoPasteEditorProps> = ({
         </div>
 
         {/* Formatting Toolbar */}
-        <div className="p-2 border-b border-gray-200 dark:border-[#27272a] bg-gray-50/70 dark:bg-[#09090b] flex flex-wrap items-center gap-1 text-gray-700 dark:text-gray-300">
+        <div className="sticky top-16 z-30 p-2 border-b border-gray-200 dark:border-[#27272a] bg-gray-50/95 dark:bg-[#09090b]/95 backdrop-blur-md flex flex-wrap items-center gap-1 text-gray-700 dark:text-gray-300 shadow-xs">
           {/* Headings */}
           <button
             type="button"
@@ -624,10 +624,11 @@ export const DuoPasteEditor: React.FC<DuoPasteEditorProps> = ({
           <button
             type="button"
             onClick={insertTable}
-            className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-[#18181b]"
-            title="Insert Table"
+            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900 border border-blue-200 dark:border-blue-800/60 text-xs font-semibold"
+            title="Insert Table (3x3 grid)"
           >
-            <TableIcon className="w-4 h-4" />
+            <TableIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+            <span>Table</span>
           </button>
 
           <div className="w-px h-5 bg-gray-300 dark:bg-[#27272a] mx-1" />

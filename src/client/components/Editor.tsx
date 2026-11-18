@@ -360,7 +360,7 @@ export const Editor: React.FC<EditorProps> = ({
 
   if (mode === "word") {
     return (
-      <div className="flex-1 flex flex-col w-full min-h-[calc(100vh-64px)]">
+      <div className="flex-1 flex flex-col w-full h-[calc(100vh-64px)] max-h-[calc(100vh-64px)] overflow-hidden">
         <WordDocEditor
           initialTitle={title}
           initialContent={editorRef.current?.innerHTML || draftContent}
@@ -421,7 +421,7 @@ export const Editor: React.FC<EditorProps> = ({
         </div>
 
         {/* Toolbar */}
-        <div className="px-4 sm:px-6 py-2.5 bg-gray-50/80 dark:bg-slate-800/60 border-b border-gray-200 dark:border-slate-800 flex flex-wrap items-center gap-1 text-gray-700 dark:text-gray-300 select-none">
+        <div className="sticky top-16 z-30 px-4 sm:px-6 py-2.5 bg-gray-50/95 dark:bg-slate-800/95 backdrop-blur-md border-b border-gray-200 dark:border-slate-800 flex flex-wrap items-center gap-1.5 text-gray-700 dark:text-gray-300 select-none shadow-xs">
           {/* Headings */}
           <button
             type="button"
@@ -600,11 +600,12 @@ export const Editor: React.FC<EditorProps> = ({
           <button
             type="button"
             onClick={insertTable}
-            className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-700"
-            title="Insert Table"
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900 border border-blue-200 dark:border-blue-800/60 font-semibold transition"
+            title="Insert Table (3x3 grid)"
             aria-label="Insert data table"
           >
-            <TableIcon className="w-4 h-4" />
+            <TableIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+            <span className="text-xs font-bold">Table</span>
           </button>
           <button
             type="button"

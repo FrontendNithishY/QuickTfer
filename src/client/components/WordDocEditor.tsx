@@ -1115,7 +1115,7 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
   };
 
   return (
-    <div className="flex-1 flex flex-col w-full bg-[#f3f4f6] dark:bg-[#0f172a] select-none text-slate-800 dark:text-slate-200 transition-colors">
+    <div className="flex-1 flex flex-col w-full h-full max-h-full overflow-hidden bg-[#f3f4f6] dark:bg-[#0f172a] select-none text-slate-800 dark:text-slate-200 transition-colors">
       
       {/* 1. Word Header Bar (Title, Quick Access Toolbar, Live Collab Bar, Mode Switcher) */}
       <div className="h-11 bg-[#2b579a] dark:bg-[#1e3a8a] text-white px-3 sm:px-4 flex items-center justify-between shadow-md shrink-0">
@@ -1328,7 +1328,7 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
       </div>
 
       {/* 3. Ribbon Toolbar Controls Canvas */}
-      <div className="bg-white dark:bg-slate-900 border-b border-gray-300 dark:border-slate-800 p-2 sm:px-4 shadow-xs shrink-0 flex flex-wrap items-center gap-y-2 gap-x-3 text-xs overflow-x-auto">
+      <div className="bg-white dark:bg-slate-900 border-b border-gray-300 dark:border-slate-800 p-2 sm:px-4 shadow-xs shrink-0 flex flex-wrap items-center gap-y-2 gap-x-3 text-xs relative z-30">
         
         {/* --- FILE TAB --- */}
         {activeTab === "file" && (
@@ -1892,6 +1892,53 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
               </button>
             </div>
 
+            {/* Table Inserter Grid on Home Tab */}
+            <div className="relative pr-2 border-r border-gray-200 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setShowTableGridPicker(!showTableGridPicker)}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded hover:bg-blue-50 dark:hover:bg-slate-800 border border-blue-200 dark:border-slate-700 bg-blue-50/60 dark:bg-slate-800/60 text-blue-700 dark:text-blue-300 font-semibold cursor-pointer"
+                title="Insert Table (Click to open grid picker)"
+              >
+                <TableIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                <span>Table</span>
+                <ChevronDown className="w-3 h-3 text-gray-400" />
+              </button>
+
+              {showTableGridPicker && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40 cursor-default"
+                    onClick={() => setShowTableGridPicker(false)}
+                  />
+                  <div className="absolute top-full left-0 mt-1 p-3 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl shadow-2xl z-50">
+                    <div className="text-[11px] font-bold text-gray-600 dark:text-gray-300 mb-2">
+                      Insert Table ({tableGridHover.rows} x {tableGridHover.cols})
+                    </div>
+                    <div className="grid grid-cols-8 gap-1 mb-2">
+                      {Array.from({ length: 8 }).map((_, r) =>
+                        Array.from({ length: 8 }).map((_, c) => (
+                          <div
+                            key={`home-${r}-${c}`}
+                            onMouseEnter={() => setTableGridHover({ rows: r + 1, cols: c + 1 })}
+                            onClick={() => handleInsertGridTable(r + 1, c + 1)}
+                            className={`w-4 h-4 rounded-xs border cursor-pointer transition ${
+                              r < tableGridHover.rows && c < tableGridHover.cols
+                                ? "bg-blue-600 border-blue-700"
+                                : "bg-gray-100 dark:bg-slate-800 border-gray-300 dark:border-slate-700"
+                            }`}
+                          />
+                        ))
+                      )}
+                    </div>
+                    <div className="text-[10px] text-gray-400 text-center">
+                      Hover over grid & click to insert
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
             {/* Editing / Find & Replace */}
             <div className="flex items-center gap-1">
               <button
@@ -1923,36 +1970,45 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
               <button
                 type="button"
                 onClick={() => setShowTableGridPicker(!showTableGridPicker)}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded hover:bg-gray-100 dark:hover:bg-slate-800 border border-gray-200 dark:border-slate-700"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded hover:bg-blue-50 dark:hover:bg-slate-800 border border-blue-200 dark:border-slate-700 bg-blue-50/60 dark:bg-slate-800/60 text-blue-700 dark:text-blue-300 font-semibold cursor-pointer"
                 title="Insert Table"
               >
-                <TableIcon className="w-4 h-4 text-blue-600" />
+                <TableIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                 <span>Table</span>
                 <ChevronDown className="w-3 h-3 text-gray-400" />
               </button>
 
               {showTableGridPicker && (
-                <div className="absolute top-full left-0 mt-1 p-3 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl shadow-2xl z-50">
-                  <div className="text-[11px] font-bold text-gray-500 mb-2">
-                    Insert Table ({tableGridHover.rows} x {tableGridHover.cols})
+                <>
+                  <div
+                    className="fixed inset-0 z-40 cursor-default"
+                    onClick={() => setShowTableGridPicker(false)}
+                  />
+                  <div className="absolute top-full left-0 mt-1 p-3 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl shadow-2xl z-50">
+                    <div className="text-[11px] font-bold text-gray-600 dark:text-gray-300 mb-2">
+                      Insert Table ({tableGridHover.rows} x {tableGridHover.cols})
+                    </div>
+                    <div className="grid grid-cols-8 gap-1 mb-2">
+                      {Array.from({ length: 8 }).map((_, r) =>
+                        Array.from({ length: 8 }).map((_, c) => (
+                          <div
+                            key={`insert-${r}-${c}`}
+                            onMouseEnter={() => setTableGridHover({ rows: r + 1, cols: c + 1 })}
+                            onClick={() => handleInsertGridTable(r + 1, c + 1)}
+                            className={`w-4 h-4 rounded-xs border cursor-pointer transition ${
+                              r < tableGridHover.rows && c < tableGridHover.cols
+                                ? "bg-blue-600 border-blue-700"
+                                : "bg-gray-100 dark:bg-slate-800 border-gray-300 dark:border-slate-700"
+                            }`}
+                          />
+                        ))
+                      )}
+                    </div>
+                    <div className="text-[10px] text-gray-400 text-center">
+                      Hover over grid & click to insert
+                    </div>
                   </div>
-                  <div className="grid grid-cols-8 gap-1 mb-2">
-                    {Array.from({ length: 8 }).map((_, r) =>
-                      Array.from({ length: 8 }).map((_, c) => (
-                        <div
-                          key={`${r}-${c}`}
-                          onMouseEnter={() => setTableGridHover({ rows: r + 1, cols: c + 1 })}
-                          onClick={() => handleInsertGridTable(r + 1, c + 1)}
-                          className={`w-4 h-4 rounded-xs border cursor-pointer transition ${
-                            r < tableGridHover.rows && c < tableGridHover.cols
-                              ? "bg-blue-600 border-blue-700"
-                              : "bg-gray-100 dark:bg-slate-800 border-gray-300 dark:border-slate-700"
-                          }`}
-                        />
-                      ))
-                    )}
-                  </div>
-                </div>
+                </>
               )}
             </div>
 
