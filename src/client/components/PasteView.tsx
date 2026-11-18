@@ -41,6 +41,8 @@ export const PasteView: React.FC<PasteViewProps> = ({
   onDeleteSuccess,
   onNavigateProfile,
 }) => {
+  const effectiveSlug = slug || (typeof window !== "undefined" && window.location.pathname.startsWith("/p/") ? window.location.pathname.slice(3) : "");
+
   const [paste, setPaste] = useState<Paste | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -58,21 +60,64 @@ export const PasteView: React.FC<PasteViewProps> = ({
 
   // Fetch paste
   useEffect(() => {
+    if (!effectiveSlug) {
+      setError("Paste not found.");
+      setLoading(false);
+      return;
+    }
     fetchPaste();
     fetchComments();
-  }, [slug]);
+  }, [effectiveSlug]);
 
   const fetchPaste = async () => {
+    if (!effectiveSlug) {
+      setError("Paste not found.");
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/pastes/${slug}`);
+      const res = await fetch(`/api/pastes/${effectiveSlug}`);
       const data = await res.json();
       if (!res.ok) {
+        // Fallback: check if paste was recently published or cached in client storage
+        const cached = sessionStorage.getItem(`sharepaste_cache_${effectiveSlug}`) || localStorage.getItem(`sharepaste_cache_${effectiveSlug}`);
+        if (cached) {
+          try {
+            const cachedPaste = JSON.parse(cached);
+            setPaste(cachedPaste);
+            setLoading(false);
+            // Re-hydrate the server container in background
+            fetch("/api/pastes", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                title: cachedPaste.title,
+                content: cachedPaste.content,
+                customSlug: effectiveSlug,
+                visibility: cachedPaste.visibility || "public"
+              })
+            }).catch(() => {});
+            return;
+          } catch {}
+        }
         throw new Error(data.error || "Failed to load paste.");
       }
       setPaste(data);
+      try {
+        sessionStorage.setItem(`sharepaste_cache_${effectiveSlug}`, JSON.stringify(data));
+      } catch {}
     } catch (err: any) {
+      const cached = sessionStorage.getItem(`sharepaste_cache_${effectiveSlug}`) || localStorage.getItem(`sharepaste_cache_${effectiveSlug}`);
+      if (cached) {
+        try {
+          setPaste(JSON.parse(cached));
+          setError(null);
+          return;
+        } catch {}
+      }
       setError(err.message);
     } finally {
       setLoading(false);
@@ -80,8 +125,9 @@ export const PasteView: React.FC<PasteViewProps> = ({
   };
 
   const fetchComments = async () => {
+    if (!effectiveSlug) return;
     try {
-      const res = await fetch(`/api/pastes/${slug}/comments`);
+      const res = await fetch(`/api/pastes/${effectiveSlug}/comments`);
       const data = await res.json();
       if (res.ok) setComments(data.comments || []);
     } catch {
@@ -91,12 +137,12 @@ export const PasteView: React.FC<PasteViewProps> = ({
 
   const handleUnlock = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!password) return;
+    if (!password || !effectiveSlug) return;
     setUnlocking(true);
     setUnlockError(null);
 
     try {
-      const res = await fetch(`/api/pastes/${slug}/unlock`, {
+      const res = await fetch(`/api/pastes/${effectiveSlug}/unlock`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password }),
@@ -112,9 +158,11 @@ export const PasteView: React.FC<PasteViewProps> = ({
     }
   };
 
+
   const handleQuickShare = async () => {
+    if (!effectiveSlug) return;
     try {
-      const res = await fetch(`/api/pastes/${slug}/quick-share`, { method: "POST" });
+      const res = await fetch(`/api/pastes/${effectiveSlug}/quick-share`, { method: "POST" });
       const data = await res.json();
       if (res.ok) onOpenQuickShare(data);
     } catch {
@@ -129,11 +177,12 @@ export const PasteView: React.FC<PasteViewProps> = ({
   };
 
   const handleDelete = async () => {
+    if (!effectiveSlug) return;
     if (!confirm("Are you sure you want to permanently delete this note?")) return;
-    const token = getEditToken(slug);
+    const token = getEditToken(effectiveSlug);
 
     try {
-      const res = await fetch(`/api/pastes/${slug}`, {
+      const res = await fetch(`/api/pastes/${effectiveSlug}`, {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",
@@ -155,11 +204,11 @@ export const PasteView: React.FC<PasteViewProps> = ({
 
   const handlePostComment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!commentText.trim()) return;
+    if (!commentText.trim() || !effectiveSlug) return;
     setSubmittingComment(true);
 
     try {
-      const res = await fetch(`/api/pastes/${slug}/comments`, {
+      const res = await fetch(`/api/pastes/${effectiveSlug}/comments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -180,6 +229,7 @@ export const PasteView: React.FC<PasteViewProps> = ({
       setSubmittingComment(false);
     }
   };
+
 
   // Download exports
   const downloadTxt = () => {
@@ -232,7 +282,8 @@ export const PasteView: React.FC<PasteViewProps> = ({
     );
   }
 
-  const hasEditAccess = !!getEditToken(slug);
+  const hasEditAccess = !!getEditToken(effectiveSlug);
+
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 flex-1 flex flex-col w-full">

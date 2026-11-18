@@ -430,9 +430,22 @@ export const CodeCompilerModal: React.FC<CodeCompilerModalProps> = ({
       const data = await res.json();
 
       if (res.ok && data.slug) {
+        try {
+          sessionStorage.setItem(`sharepaste_cache_${data.slug}`, JSON.stringify({
+            slug: data.slug,
+            title: payloadTitle,
+            content: compilerPayload,
+            isEncrypted: false,
+            visibility: "public",
+            authorName: "Anonymous",
+            createdAt: Date.now(),
+            updatedAt: Date.now()
+          }));
+        } catch {}
         onClose();
         onPublishSuccess(data.slug);
       } else {
+
         alert(data.error || "Failed to publish code.");
       }
     } catch (err: any) {

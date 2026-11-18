@@ -272,8 +272,22 @@ export const DuoPasteEditor: React.FC<DuoPasteEditorProps> = ({
       });
       const data = await res.json();
       if (res.ok && data.slug) {
+        try {
+          const currentHtml = editorRef.current ? editorRef.current.innerHTML : "";
+          sessionStorage.setItem(`sharepaste_cache_${data.slug}`, JSON.stringify({
+            slug: data.slug,
+            title,
+            content: currentHtml,
+            isEncrypted: false,
+            visibility: "public",
+            authorName: "DuoPaste Collaborators",
+            createdAt: Date.now(),
+            updatedAt: Date.now()
+          }));
+        } catch {}
         onPublishSuccess(data.slug);
       } else {
+
         alert(data.error || "Failed to publish shared paste.");
       }
     } catch (err) {

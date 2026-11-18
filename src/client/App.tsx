@@ -184,6 +184,10 @@ export const App: React.FC = () => {
     setView(newView);
     window.scrollTo(0, 0);
 
+    if (newView === "paste" && path.startsWith("/p/")) {
+      setCurrentSlug(path.slice(3));
+    }
+
     if (newView === "editor") {
       updateSEO({
         title: "SharePaste - Fast Paste, Transfer & 60-Minute Quick Sharing",
@@ -192,6 +196,7 @@ export const App: React.FC = () => {
       });
     }
   };
+
 
   const handleLandingAction = (preset?: "burn" | "encrypt" | "quick" | "math") => {
     if (preset === "math") {
@@ -249,7 +254,22 @@ export const App: React.FC = () => {
         saveEditToken(data.slug, data.editToken);
       }
 
+      // Cache paste to avoid any serverless cold-start 404s
+      try {
+        sessionStorage.setItem(`sharepaste_cache_${data.slug}`, JSON.stringify({
+          slug: data.slug,
+          title: draftPayload.title,
+          content: draftPayload.content,
+          isEncrypted: !!options.password,
+          visibility: options.visibility || "public",
+          authorName: user?.username || "Anonymous",
+          createdAt: Date.now(),
+          updatedAt: Date.now()
+        }));
+      } catch {}
+
       setIsPublishOpen(false);
+
       setSuccessData({
         slug: data.slug,
         title: data.title,
@@ -319,11 +339,13 @@ export const App: React.FC = () => {
               navigateTo("editor", "/");
             }}
             onPublishSuccess={(slug) => {
+              setCurrentSlug(slug);
               setActiveDuoSession(null);
               navigateTo("paste", `/p/${slug}`);
             }}
           />
         )}
+
 
 
         {view === "paste" && (
