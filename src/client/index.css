@@ -213,3 +213,192 @@
   border-radius: 0 !important;
 }
 
+/* ==========================================================================
+   Microsoft Word High-Fidelity Typography, Alignment & Multi-Page Styling
+   ========================================================================== */
+.word-editor-canvas {
+  font-family: Calibri, 'Segoe UI', Candara, sans-serif;
+  font-size: 11pt;
+  line-height: 1.15;
+  color: #000000;
+  text-align: left;
+}
+
+.dark .word-editor-canvas {
+  color: #f1f5f9;
+}
+
+/* Authentic Word Paragraph Spacing (8pt after, 1.15 line-height) */
+.word-editor-canvas p {
+  margin: 0 0 8pt 0;
+  line-height: 1.15;
+}
+
+/* Strict Word Alignment Preservation */
+.word-editor-canvas [style*="text-align: center"],
+.word-editor-canvas p[style*="text-align: center"],
+.word-editor-canvas h1[style*="text-align: center"],
+.word-editor-canvas h2[style*="text-align: center"],
+.word-editor-canvas h3[style*="text-align: center"],
+.word-editor-canvas div[style*="text-align: center"],
+.word-editor-canvas td[style*="text-align: center"],
+.word-editor-canvas th[style*="text-align: center"],
+.word-editor-canvas .text-center {
+  text-align: center !important;
+}
+
+.word-editor-canvas [style*="text-align: right"],
+.word-editor-canvas p[style*="text-align: right"],
+.word-editor-canvas h1[style*="text-align: right"],
+.word-editor-canvas h2[style*="text-align: right"],
+.word-editor-canvas h3[style*="text-align: right"],
+.word-editor-canvas div[style*="text-align: right"],
+.word-editor-canvas td[style*="text-align: right"],
+.word-editor-canvas th[style*="text-align: right"],
+.word-editor-canvas .text-right {
+  text-align: right !important;
+}
+
+.word-editor-canvas [style*="text-align: justify"],
+.word-editor-canvas p[style*="text-align: justify"],
+.word-editor-canvas h1[style*="text-align: justify"],
+.word-editor-canvas h2[style*="text-align: justify"],
+.word-editor-canvas h3[style*="text-align: justify"],
+.word-editor-canvas div[style*="text-align: justify"],
+.word-editor-canvas .text-justify {
+  text-align: justify !important;
+  text-justify: inter-word;
+}
+
+.word-editor-canvas [style*="text-align: left"],
+.word-editor-canvas p[style*="text-align: left"],
+.word-editor-canvas .text-left {
+  text-align: left !important;
+}
+
+/* Word Classic Heading Typography */
+.word-editor-canvas h1 {
+  font-family: 'Calibri Light', Calibri, sans-serif;
+  font-size: 20pt;
+  font-weight: 400;
+  color: #1f497d;
+  margin: 12pt 0 4pt 0;
+  line-height: 1.2;
+}
+
+.dark .word-editor-canvas h1 {
+  color: #93c5fd;
+}
+
+.word-editor-canvas h2 {
+  font-family: 'Calibri Light', Calibri, sans-serif;
+  font-size: 15pt;
+  font-weight: 400;
+  color: #2e75b6;
+  margin: 10pt 0 3pt 0;
+  line-height: 1.25;
+}
+
+.dark .word-editor-canvas h2 {
+  color: #60a5fa;
+}
+
+.word-editor-canvas h3 {
+  font-family: Calibri, sans-serif;
+  font-size: 12.5pt;
+  font-weight: 700;
+  color: #1f497d;
+  margin: 8pt 0 2pt 0;
+  line-height: 1.3;
+}
+
+.dark .word-editor-canvas h3 {
+  color: #93c5fd;
+}
+
+/* Word Table Styles */
+.word-editor-canvas table {
+  border-collapse: collapse;
+  margin: 12pt 0;
+  width: 100%;
+  border: 1px solid #bfbfbf;
+}
+
+.dark .word-editor-canvas table {
+  border-color: #475569;
+}
+
+.word-editor-canvas th,
+.word-editor-canvas td {
+  border: 1px solid #d9d9d9;
+  padding: 6pt 8pt;
+  vertical-align: top;
+}
+
+.dark .word-editor-canvas th,
+.dark .word-editor-canvas td {
+  border-color: #334155;
+}
+
+.word-editor-canvas th {
+  background-color: #f2f2f2;
+  font-weight: 700;
+  color: #000000;
+}
+
+.dark .word-editor-canvas th {
+  background-color: #1e293b;
+  color: #f1f5f9;
+}
+
+/* Word Lists */
+.word-editor-canvas ul {
+  list-style-type: disc;
+  padding-left: 36pt;
+  margin: 0 0 8pt 0;
+}
+
+.word-editor-canvas ol {
+  list-style-type: decimal;
+  padding-left: 36pt;
+  margin: 0 0 8pt 0;
+}
+
+.word-editor-canvas li {
+  margin-bottom: 2pt;
+  line-height: 1.15;
+}
+
+/* Word Page Break Marker */
+.word-page-break {
+  display: block;
+  border: none;
+  height: 2px;
+  background-color: #cbd5e1;
+  margin: 2rem 0;
+  position: relative;
+  page-break-after: always;
+  break-after: page;
+}
+
+/* Word Distinct Physical A4 Page Sheets */
+.word-page-sheet {
+  box-shadow: 0 8px 30px -4px rgba(0, 0, 0, 0.12), 0 2px 8px -2px rgba(0, 0, 0, 0.08);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.word-page-sheet:focus-within {
+  box-shadow: 0 12px 36px -4px rgba(37, 99, 235, 0.2), 0 4px 12px -2px rgba(0, 0, 0, 0.1);
+}
+
+@media print {
+  .word-page-sheet {
+    box-shadow: none !important;
+    border: none !important;
+    margin: 0 !important;
+    page-break-after: always !important;
+    break-after: page !important;
+  }
+}
+
+

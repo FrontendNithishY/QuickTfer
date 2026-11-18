@@ -57,6 +57,7 @@ import katex from "katex";
 import * as mammoth from "mammoth";
 import QRCode from "qrcode";
 import { DuoSession } from "../types.js";
+import { splitIntoPages, joinPagesToHtml, parseDocxBuffer } from "../utils/wordParser.js";
 
 export interface WordDocEditorProps {
   initialTitle?: string;
@@ -215,10 +216,13 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
   const [charCount, setCharCount] = useState(0);
   const [charNoSpaces, setCharNoSpaces] = useState(0);
   const [paraCount, setParaCount] = useState(1);
-  const [pageCount, setPageCount] = useState(1);
+  const [pages, setPages] = useState<string[]>(() => splitIntoPages(initialContent || ""));
+  const [activePageIndex, setActivePageIndex] = useState<number>(0);
+  const [pageCount, setPageCount] = useState<number>(() => Math.max(1, splitIntoPages(initialContent || "").length));
   const [savedTime, setSavedTime] = useState<string>("Saved just now");
 
-  const canvasRef = useRef<HTMLDivElement>(null);
+  const pageRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const canvasRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const docxInputRef = useRef<HTMLInputElement>(null);
   const titleRef = useRef(title);
@@ -226,11 +230,29 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
   const syncTimeoutRef = useRef<any>(null);
   const isApplyingRemoteRef = useRef(false);
 
+  // Assemble full document HTML across all individual page cards
+  const getFullDocumentHtml = () => {
+    const assembled = pages.map((pageHtml, i) => {
+      const el = pageRefs.current[i];
+      return el ? el.innerHTML : pageHtml;
+    });
+    return joinPagesToHtml(assembled);
+  };
+
   // Initialize content
   useEffect(() => {
-    if (canvasRef.current && initialContent) {
-      canvasRef.current.innerHTML = initialContent;
-      updateStats();
+    if (initialContent) {
+      const parsed = splitIntoPages(initialContent);
+      setPages(parsed);
+      setPageCount(parsed.length);
+      setTimeout(() => {
+        parsed.forEach((p, idx) => {
+          if (pageRefs.current[idx]) {
+            pageRefs.current[idx]!.innerHTML = p;
+          }
+        });
+        updateStats();
+      }, 0);
     }
   }, [initialContent]);
 
@@ -248,22 +270,28 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
   }, [propCollabSession, propClientId, propRole]);
 
   const updateStats = () => {
-    if (!canvasRef.current) return;
-    const text = canvasRef.current.innerText || "";
-    const trimmed = text.trim();
-    const words = trimmed ? trimmed.split(/\s+/).filter(Boolean).length : 0;
-    const chars = text.length;
-    const noSpaces = text.replace(/\s+/g, "").length;
-    const paras = text.split(/\n+/).filter(p => p.trim().length > 0).length || 1;
-    
-    // Estimate physical pages based on word count (~350 words per A4 page)
-    const pages = Math.max(1, Math.ceil(words / 350));
+    let words = 0;
+    let chars = 0;
+    let noSpaces = 0;
+    let paras = 0;
+
+    pages.forEach((_, i) => {
+      const el = pageRefs.current[i];
+      const text = el ? (el.innerText || "") : "";
+      const trimmed = text.trim();
+      if (trimmed) {
+        words += trimmed.split(/\s+/).filter(Boolean).length;
+        paras += text.split(/\n+/).filter(p => p.trim().length > 0).length || 1;
+      }
+      chars += text.length;
+      noSpaces += text.replace(/\s+/g, "").length;
+    });
 
     setWordCount(words);
     setCharCount(chars);
     setCharNoSpaces(noSpaces);
-    setParaCount(paras);
-    setPageCount(pages);
+    setParaCount(Math.max(1, paras));
+    setPageCount(pages.length);
     setSavedTime("Saved to browser");
   };
 
@@ -278,7 +306,7 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
 
     syncTimeoutRef.current = setTimeout(async () => {
       try {
-        const currentHtml = canvasRef.current ? canvasRef.current.innerHTML : "";
+        const currentHtml = getFullDocumentHtml();
         const res = await fetch("/api/duo/sync", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -334,13 +362,22 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
               setTitle(data.title);
             }
 
-            if (data.content !== undefined && canvasRef.current) {
-              const currentLocalHtml = canvasRef.current.innerHTML;
+            if (data.content !== undefined) {
+              const currentLocalHtml = getFullDocumentHtml();
               if (currentLocalHtml !== data.content) {
                 isApplyingRemoteRef.current = true;
-                canvasRef.current.innerHTML = data.content;
-                updateStats();
-                isApplyingRemoteRef.current = false;
+                const incomingPages = splitIntoPages(data.content);
+                setPages(incomingPages);
+                setPageCount(incomingPages.length);
+                setTimeout(() => {
+                  incomingPages.forEach((p, idx) => {
+                    if (pageRefs.current[idx]) {
+                      pageRefs.current[idx]!.innerHTML = p;
+                    }
+                  });
+                  updateStats();
+                  isApplyingRemoteRef.current = false;
+                }, 0);
               }
             }
           }
@@ -350,7 +387,7 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
               sessionStorage.setItem(`sharepaste_cache_${data.slug}`, JSON.stringify({
                 slug: data.slug,
                 title,
-                content: canvasRef.current?.innerHTML || "",
+                content: getFullDocumentHtml(),
                 isEncrypted: false,
                 visibility: "public",
                 authorName: "Word Collab Collaborators",
@@ -402,10 +439,73 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
 
   const exec = (command: string, value: string | undefined = undefined) => {
     document.execCommand(command, false, value);
-    if (canvasRef.current) {
-      canvasRef.current.focus();
+    const activePage = pageRefs.current[activePageIndex] || pageRefs.current[0];
+    if (activePage) {
+      activePage.focus();
+    }
+    updateStats();
+    queueCollabSync();
+  };
+
+  const handleAddPage = (insertIndex: number) => {
+    const currentPages = pages.map((pageHtml, i) => {
+      const el = pageRefs.current[i];
+      return el ? el.innerHTML : pageHtml;
+    });
+    currentPages.splice(insertIndex, 0, "<p><br></p>");
+    setPages(currentPages);
+    setPageCount(currentPages.length);
+    setActivePageIndex(insertIndex);
+    setTimeout(() => {
+      currentPages.forEach((p, idx) => {
+        if (pageRefs.current[idx]) {
+          pageRefs.current[idx]!.innerHTML = p;
+        }
+      });
+      if (pageRefs.current[insertIndex]) {
+        pageRefs.current[insertIndex]!.focus();
+      }
       updateStats();
       queueCollabSync();
+    }, 0);
+  };
+
+  const handleDeletePage = (targetIndex: number) => {
+    if (pages.length <= 1) return;
+    if (confirm(`Delete Page ${targetIndex + 1}?`)) {
+      const currentPages = pages.map((pageHtml, i) => {
+        const el = pageRefs.current[i];
+        return el ? el.innerHTML : pageHtml;
+      });
+      currentPages.splice(targetIndex, 1);
+      setPages(currentPages);
+      setPageCount(currentPages.length);
+      const nextActive = Math.max(0, targetIndex - 1);
+      setActivePageIndex(nextActive);
+      setTimeout(() => {
+        currentPages.forEach((p, idx) => {
+          if (pageRefs.current[idx]) {
+            pageRefs.current[idx]!.innerHTML = p;
+          }
+        });
+        if (pageRefs.current[nextActive]) {
+          pageRefs.current[nextActive]!.focus();
+        }
+        updateStats();
+        queueCollabSync();
+      }, 0);
+    }
+  };
+
+  const handlePageInput = (index: number) => {
+    updateStats();
+    queueCollabSync();
+  };
+
+  const handlePageKeyDown = (e: React.KeyboardEvent<HTMLDivElement>, index: number) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+      e.preventDefault();
+      handleAddPage(index + 1);
     }
   };
 
@@ -570,8 +670,9 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
     setLineSpacing(spacing);
     const selection = window.getSelection();
     if (!selection) return;
+    const activePage = pageRefs.current[activePageIndex] || pageRefs.current[0];
     let node = selection.anchorNode;
-    while (node && node !== canvasRef.current) {
+    while (node && node !== activePage && node !== document.body) {
       if (node instanceof HTMLElement && (node.tagName === "P" || node.tagName === "DIV" || node.tagName === "LI")) {
         node.style.lineHeight = spacing;
         break;
@@ -586,8 +687,9 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
   const handleParagraphShading = (color: string) => {
     const selection = window.getSelection();
     if (!selection) return;
+    const activePage = pageRefs.current[activePageIndex] || pageRefs.current[0];
     let node = selection.anchorNode;
-    while (node && node !== canvasRef.current) {
+    while (node && node !== activePage && node !== document.body) {
       if (node instanceof HTMLElement && (node.tagName === "P" || node.tagName === "DIV" || node.tagName === "BLOCKQUOTE")) {
         node.style.backgroundColor = color;
         node.style.padding = "8px 12px";
@@ -602,10 +704,11 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
   // Quick Styles Application
   const applyQuickStyle = (style: { name: string; tag: string; classes?: string; css?: string }) => {
     exec("formatBlock", `<${style.tag}>`);
-    if (style.css && canvasRef.current) {
+    if (style.css) {
       const selection = window.getSelection();
+      const activePage = pageRefs.current[activePageIndex] || pageRefs.current[0];
       let node = selection?.anchorNode;
-      while (node && node !== canvasRef.current) {
+      while (node && node !== activePage && node !== document.body) {
         if (node instanceof HTMLElement && node.tagName.toLowerCase() === style.tag) {
           node.setAttribute("style", style.css);
           break;
@@ -692,7 +795,7 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
 
   // Insert Page Break
   const handleInsertPageBreak = () => {
-    exec("insertHTML", `<hr style="border:none; border-top:2px dashed #94a3b8; margin:24px 0; text-align:center;" data-page-break="true" /><p><br></p>`);
+    handleAddPage(activePageIndex + 1);
   };
 
   // Insert Date & Time
@@ -702,21 +805,34 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
     exec("insertText", formatted);
   };
 
-  // Find & Replace Execution
+  // Find & Replace Execution across all document pages
   const handleFind = () => {
-    if (!findText || !canvasRef.current) return;
-    const content = canvasRef.current.innerText || "";
+    if (!findText) {
+      setFindCount(null);
+      return;
+    }
     const flags = matchCase ? "g" : "gi";
-    const matches = content.match(new RegExp(findText, flags));
-    setFindCount(matches ? matches.length : 0);
+    let count = 0;
+    pages.forEach((_, i) => {
+      const el = pageRefs.current[i];
+      const content = el?.innerText || "";
+      const matches = content.match(new RegExp(findText, flags));
+      if (matches) count += matches.length;
+    });
+    setFindCount(count);
   };
 
   const handleReplaceAll = () => {
-    if (!findText || !canvasRef.current) return;
-    const currentHtml = canvasRef.current.innerHTML;
+    if (!findText) return;
     const flags = matchCase ? "g" : "gi";
-    const newHtml = currentHtml.replace(new RegExp(findText, flags), replaceText);
-    canvasRef.current.innerHTML = newHtml;
+    const updated = pages.map((pageHtml, i) => {
+      const el = pageRefs.current[i];
+      const cur = el ? el.innerHTML : pageHtml;
+      const replaced = cur.replace(new RegExp(findText, flags), replaceText);
+      if (el) el.innerHTML = replaced;
+      return replaced;
+    });
+    setPages(updated);
     updateStats();
     handleFind();
     queueCollabSync();
@@ -724,7 +840,7 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
 
   // Export as Word (.docx / Word HTML MIME)
   const handleExportDocx = () => {
-    if (!canvasRef.current) return;
+    const fullHtml = getFullDocumentHtml();
     const docHtml = `
       <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
       <head>
@@ -747,7 +863,7 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
       </head>
       <body>
         <h1>${title || "Document"}</h1>
-        ${canvasRef.current.innerHTML}
+        ${fullHtml}
       </body>
       </html>
     `;
@@ -765,43 +881,76 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
     window.print();
   };
 
-  // Import Document (.docx, .doc, .html, .txt, .md) with Mammoth binary decoding
+  // Import Document (.docx, .doc, .html, .txt, .md) with Mammoth binary decoding & alignment preservation
   const handleDocImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !canvasRef.current) return;
+    if (!file) return;
     const lowerName = file.name.toLowerCase();
 
     try {
       if (lowerName.endsWith(".docx")) {
         const arrayBuffer = await file.arrayBuffer();
-        const result = await mammoth.convertToHtml({ arrayBuffer });
-        if (result.value && canvasRef.current) {
-          canvasRef.current.innerHTML = result.value;
-          updateStats();
-          queueCollabSync();
+        const html = await parseDocxBuffer(arrayBuffer);
+        if (html) {
+          const parsedPages = splitIntoPages(html);
+          setPages(parsedPages);
+          setPageCount(parsedPages.length);
+          setActivePageIndex(0);
+          setTimeout(() => {
+            parsedPages.forEach((p, idx) => {
+              if (pageRefs.current[idx]) {
+                pageRefs.current[idx]!.innerHTML = p;
+              }
+            });
+            updateStats();
+            queueCollabSync();
+          }, 0);
         } else {
           alert("Could not extract content from this Word document (.docx).");
         }
       } else if (lowerName.endsWith(".html") || lowerName.endsWith(".htm") || lowerName.endsWith(".doc")) {
         const text = await file.text();
+        let cleanHtml = text;
         if (text.includes("<html") || text.includes("<body") || text.includes("<p>")) {
           const parser = new DOMParser();
           const doc = parser.parseFromString(text, "text/html");
-          canvasRef.current.innerHTML = doc.body.innerHTML || text;
+          cleanHtml = doc.body.innerHTML || text;
         } else {
-          canvasRef.current.innerHTML = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>");
+          cleanHtml = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>");
         }
-        updateStats();
-        queueCollabSync();
+        const parsedPages = splitIntoPages(cleanHtml);
+        setPages(parsedPages);
+        setPageCount(parsedPages.length);
+        setActivePageIndex(0);
+        setTimeout(() => {
+          parsedPages.forEach((p, idx) => {
+            if (pageRefs.current[idx]) {
+              pageRefs.current[idx]!.innerHTML = p;
+            }
+          });
+          updateStats();
+          queueCollabSync();
+        }, 0);
       } else {
         const text = await file.text();
-        canvasRef.current.innerHTML = text
+        const cleanHtml = text
           .replace(/&/g, "&amp;")
           .replace(/</g, "&lt;")
           .replace(/>/g, "&gt;")
           .replace(/\n/g, "<br>");
-        updateStats();
-        queueCollabSync();
+        const parsedPages = splitIntoPages(cleanHtml);
+        setPages(parsedPages);
+        setPageCount(parsedPages.length);
+        setActivePageIndex(0);
+        setTimeout(() => {
+          parsedPages.forEach((p, idx) => {
+            if (pageRefs.current[idx]) {
+              pageRefs.current[idx]!.innerHTML = p;
+            }
+          });
+          updateStats();
+          queueCollabSync();
+        }, 0);
       }
     } catch (err) {
       console.error("Document import error:", err);
@@ -812,7 +961,7 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
   // Start Word Collab session
   const handleStartWordCollab = async () => {
     try {
-      const currentHtml = canvasRef.current ? canvasRef.current.innerHTML : "";
+      const currentHtml = getFullDocumentHtml();
       const res = await fetch("/api/duo/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -873,9 +1022,19 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
         setRole("guest");
         setCollaboratorsCount(2);
         if (data.session.title) setTitle(data.session.title);
-        if (data.session.content && canvasRef.current) {
-          canvasRef.current.innerHTML = data.session.content;
-          updateStats();
+        if (data.session.content) {
+          const parsedPages = splitIntoPages(data.session.content);
+          setPages(parsedPages);
+          setPageCount(parsedPages.length);
+          setActivePageIndex(0);
+          setTimeout(() => {
+            parsedPages.forEach((p, idx) => {
+              if (pageRefs.current[idx]) {
+                pageRefs.current[idx]!.innerHTML = p;
+              }
+            });
+            updateStats();
+          }, 0);
         }
         setShowCollabModal(false);
       } else {
@@ -890,8 +1049,7 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
 
   // Publish (handles both local document and synchronized Word Collab)
   const handlePublish = async () => {
-    if (!canvasRef.current) return;
-    const content = canvasRef.current.innerHTML || "";
+    const content = getFullDocumentHtml();
     if (!content.trim() || content === "<p><br></p>") {
       alert("Please add some content to your Word document before publishing.");
       return;
@@ -2151,51 +2309,97 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
         </div>
       )}
 
-      {/* 5. Document Scrollable Workspace & Paginated Paper Sheet */}
+      {/* 5. Document Scrollable Workspace & Paginated Paper Sheets */}
       <div
-        className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-8 flex flex-col items-center justify-start cursor-default"
+        className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-8 flex flex-col items-center justify-start cursor-default bg-[#f3f4f6] dark:bg-[#09090b]"
         onClick={handleApplyFormatPainter}
       >
         <div
-          style={{
-            zoom: `${zoom}%`,
-            fontFamily: fontFamily,
-            columnCount: columns !== "1" ? columns : undefined,
-            columnGap: "32px"
-          }}
-          className={`${getPageWidthClass()} ${getPaperBg()} ${getMarginClass()} rounded-xs min-h-[960px] relative transition-all focus-within:ring-1 focus-within:ring-blue-400/50`}
+          style={{ zoom: `${zoom}%` }}
+          className="w-full flex flex-col items-center"
         >
-          {/* Watermark (if set) */}
-          {watermark && (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0">
-              <span className="text-gray-200/50 dark:text-slate-800/60 font-black text-6xl sm:text-8xl tracking-widest -rotate-45 uppercase">
-                {watermark}
-              </span>
-            </div>
-          )}
+          {pages.map((pageHtml, index) => (
+            <div
+              key={index}
+              onClick={() => setActivePageIndex(index)}
+              className={`word-page-sheet w-full ${getPageWidthClass()} ${getPaperBg()} ${getMarginClass()} rounded-xs relative transition-all shadow-md hover:shadow-lg mx-auto mb-8 focus-within:ring-2 focus-within:ring-blue-500/50`}
+              style={{
+                minHeight: "1056px",
+                fontFamily: fontFamily,
+                columnCount: columns !== "1" ? columns : undefined,
+                columnGap: "32px"
+              }}
+            >
+              {/* Watermark (if set) */}
+              {watermark && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0">
+                  <span className="text-gray-200/50 dark:text-slate-800/60 font-black text-6xl sm:text-8xl tracking-widest -rotate-45 uppercase">
+                    {watermark}
+                  </span>
+                </div>
+              )}
 
-          {/* Editable Document Body */}
-          <div
-            ref={canvasRef}
-            contentEditable
-            onInput={() => {
-              updateStats();
-              queueCollabSync();
-            }}
-            data-placeholder="Start typing your Word document here..."
-            className="paste-content outline-none min-h-[820px] empty:before:content-[attr(data-placeholder)] empty:before:text-gray-400 dark:empty:before:text-gray-600 relative z-10"
-            style={{
-              fontSize: `${fontSize}pt`,
-              lineHeight: lineSpacing
-            }}
-          />
+              {/* Page Header (Word Style) */}
+              <div className="flex items-center justify-between pb-2 mb-4 border-b border-gray-200 dark:border-slate-800 text-[11px] text-gray-400 select-none">
+                <span className="font-medium truncate max-w-[240px]">{title || "Word Document"}</span>
+                <div className="flex items-center gap-3">
+                  <span className="font-semibold text-gray-500 dark:text-gray-400">Page {index + 1} of {pages.length}</span>
+                  {pages.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeletePage(index);
+                      }}
+                      className="hover:text-red-600 dark:hover:text-red-400 transition px-2 py-0.5 rounded text-[10px] font-medium bg-gray-100 dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-950/40"
+                      title={`Delete Page ${index + 1}`}
+                    >
+                      Delete Page
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Editable Page Body Canvas */}
+              <div
+                ref={(el) => { pageRefs.current[index] = el; }}
+                contentEditable
+                onInput={() => handlePageInput(index)}
+                onFocus={() => setActivePageIndex(index)}
+                onKeyDown={(e) => handlePageKeyDown(e, index)}
+                data-placeholder={index === 0 ? "Start typing your Word document here..." : `Continue typing on Page ${index + 1}...`}
+                className="word-editor-canvas outline-none min-h-[920px] empty:before:content-[attr(data-placeholder)] empty:before:text-gray-400 dark:empty:before:text-gray-600 relative z-10"
+                style={{
+                  fontSize: `${fontSize}pt`,
+                  lineHeight: lineSpacing
+                }}
+              />
+
+              {/* Page Footer (Word Style) */}
+              <div className="flex items-center justify-center pt-3 mt-4 border-t border-gray-200 dark:border-slate-800 text-[11px] text-gray-400 select-none">
+                <span>Page {index + 1} of {pages.length}</span>
+              </div>
+            </div>
+          ))}
+
+          {/* Quick Add Page Gutter Action */}
+          <div className="flex items-center justify-center my-3 select-none">
+            <button
+              type="button"
+              onClick={() => handleAddPage(pages.length)}
+              className="px-4 py-2 rounded-lg border border-dashed border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:border-blue-500 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition shadow-sm flex items-center gap-2 cursor-pointer"
+            >
+              <span className="text-base font-bold leading-none">+</span>
+              <span>Insert Page {pages.length + 1}</span>
+            </button>
+          </div>
         </div>
       </div>
 
       {/* 6. Word Bottom Status Bar (Word 365 Style) */}
       <div className="h-7 bg-[#2b579a] dark:bg-[#1e3a8a] text-white px-4 flex items-center justify-between text-[11px] font-medium shrink-0 shadow-inner">
         <div className="flex items-center gap-4">
-          <span>Page {pageCount} of {pageCount}</span>
+          <span>Page {activePageIndex + 1} of {pages.length}</span>
           <span>{wordCount} words</span>
           <span className="hidden sm:inline">{charCount} characters</span>
           <span className="hidden md:inline">English (United States)</span>

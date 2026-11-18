@@ -10,6 +10,8 @@ import aiRouter from "../src/server/routes/ai.js";
 import { highlightCodeTokens } from "../src/client/utils/syntaxHighlight.js";
 import duoRouter from "../src/server/routes/duo.js";
 import * as mammoth from "mammoth";
+import JSZip from "jszip";
+import { parseDocxBuffer, splitIntoPages, joinPagesToHtml } from "../src/client/utils/wordParser.js";
 
 const app = express();
 app.use(express.json());
@@ -520,8 +522,101 @@ print(f"Total: {metrics['total']} | Average: {metrics['mean']:.2f} | Status: {me
     assert.ok(finalSharedPaste.content.includes("background-color:#ffff00"));
     console.log(`✓ Collaborative Word document published successfully at /p/${pubCollabData.slug} with both User A & User B edits!`);
 
+    // 17. Test Word Document Alignment Extraction, Multi-Page Division & Sheet Rendering
+    console.log("[Test 17] Testing Word Document Alignment Extraction & Multi-Page Division...");
+
+    // Build a mock .docx zip with Word XML containing alignments and page breaks
+    const testDocxZip = new JSZip();
+    testDocxZip.file("[Content_Types].xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+      <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+        <Default Extension="xml" ContentType="application/xml"/>
+        <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+        <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+      </Types>`);
+    testDocxZip.file("_rels/.rels", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+      <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+        <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+      </Relationships>`);
+
+    const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+      <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+        <w:body>
+          <w:p>
+            <w:pPr><w:jc w:val="center"/></w:pPr>
+            <w:r><w:t>CENTER ALIGNED TITLE ON PAGE 1</w:t></w:r>
+          </w:p>
+          <w:p>
+            <w:pPr><w:jc w:val="right"/></w:pPr>
+            <w:r><w:t>RIGHT ALIGNED DATE ON PAGE 1</w:t></w:r>
+          </w:p>
+          <w:p>
+            <w:pPr><w:jc w:val="both"/></w:pPr>
+            <w:r><w:t>JUSTIFIED PARAGRAPH SPREAD ACROSS ENTIRE PAGE 1 WIDTH</w:t></w:r>
+          </w:p>
+          <w:p>
+            <w:r>
+              <w:lastRenderedPageBreak/>
+              <w:t>NATURAL PAGE 2 CONTENT DIVIDED LIKE MS WORD</w:t>
+            </w:r>
+          </w:p>
+          <w:p>
+            <w:r>
+              <w:br w:type="page"/>
+              <w:t>EXPLICIT PAGE 3 CONTENT ON A4 PHYSICAL SHEET</w:t>
+            </w:r>
+          </w:p>
+        </w:body>
+      </w:document>`;
+    testDocxZip.file("word/document.xml", documentXml);
+
+    const docxBuffer = await testDocxZip.generateAsync({ type: "nodebuffer" });
+    const parsedHtml = await parseDocxBuffer(docxBuffer.buffer);
+
+    // Verify alignment preservation
+    assert.ok(parsedHtml.includes("text-align: center"), "Must preserve text-align: center from <w:jc w:val='center'/>");
+    assert.ok(parsedHtml.includes("text-align: right"), "Must preserve text-align: right from <w:jc w:val='right'/>");
+    assert.ok(parsedHtml.includes("text-align: justify"), "Must preserve text-align: justify from <w:jc w:val='both'/>");
+    assert.ok(parsedHtml.includes("CENTER ALIGNED TITLE ON PAGE 1"));
+    assert.ok(parsedHtml.includes("RIGHT ALIGNED DATE ON PAGE 1"));
+    assert.ok(parsedHtml.includes("JUSTIFIED PARAGRAPH"));
+    console.log("✓ Word document alignments (center, right, justify) 100% extracted & preserved");
+
+    // Verify multi-page division into individual physical pages (not combined)
+    const dividedPages = splitIntoPages(parsedHtml);
+    assert.strictEqual(dividedPages.length, 3, "Document must be cleanly divided into 3 separate pages, NOT combined into one");
+    assert.ok(dividedPages[0].includes("CENTER ALIGNED TITLE ON PAGE 1"), "Page 1 contains page 1 text");
+    assert.ok(dividedPages[1].includes("NATURAL PAGE 2 CONTENT"), "Page 2 contains natural page 2 text");
+    assert.ok(dividedPages[2].includes("EXPLICIT PAGE 3 CONTENT"), "Page 3 contains explicit page 3 text");
+    console.log("✓ Document cleanly divided into 3 distinct MS Word A4 pages (no combining)");
+
+    // Verify re-joining pages preserves division
+    const rejoined = joinPagesToHtml(dividedPages);
+    const redivided = splitIntoPages(rejoined);
+    assert.strictEqual(redivided.length, 3, "Rejoined document preserves page count when re-split");
+    console.log("✓ Document page joining and splitting cycle verified");
+
+    // Publish multi-page Word document via API
+    const multiPageRes = await fetch(`${baseUrl}/api/pastes`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: "Executive Strategic Roadmap (3 Pages)",
+        content: rejoined,
+        visibility: "public"
+      })
+    });
+    assert.strictEqual(multiPageRes.status, 201, "Multi-page Word document published with 201");
+    const multiPageData = await multiPageRes.json() as any;
+    assert.ok(multiPageData.slug, "Multi-page paste has slug");
+
+    const fetchedMultiPage = await (await fetch(`${baseUrl}/api/pastes/${multiPageData.slug}`)).json() as any;
+    const fetchedPages = splitIntoPages(fetchedMultiPage.content);
+    assert.strictEqual(fetchedPages.length, 3, "Published note preserves 3 distinct pages on read");
+    assert.ok(fetchedPages[0].includes("text-align: center"), "Page 1 preserves center alignment in storage and API");
+    console.log(`✓ Multi-page Word document verified on /p/${multiPageData.slug} with 3 distinct pages and original alignments!`);
+
     console.log("\n=======================================================");
-    console.log("🎉 ALL AUTOMATED TESTS PASSED SUCCESSFULLY! (16/16) 🎉");
+    console.log("🎉 ALL AUTOMATED TESTS PASSED SUCCESSFULLY! (17/17) 🎉");
     console.log("=======================================================\n");
 
 

@@ -23,6 +23,7 @@ import {
   ChevronDown
 } from "lucide-react";
 import { InteractiveCodeViewer } from "./InteractiveCodeViewer.js";
+import { splitIntoPages } from "../utils/wordParser.js";
 
 interface PasteViewProps {
   slug: string;
@@ -542,6 +543,40 @@ export const PasteView: React.FC<PasteViewProps> = ({
               console.error("Code parse error:", err);
             }
           }
+
+          const isWordDoc = paste.content && (
+            paste.content.includes("data-page-break") ||
+            paste.content.includes("word-page-break") ||
+            paste.content.includes("word-editor-canvas") ||
+            paste.content.includes("w:lastRenderedPageBreak")
+          );
+
+          if (isWordDoc) {
+            const docPages = splitIntoPages(paste.content);
+            return (
+              <div className="flex flex-col items-center gap-6 my-2 w-full">
+                {docPages.map((pageHtml, pIndex) => (
+                  <div
+                    key={pIndex}
+                    className="word-page-sheet w-full max-w-[816px] min-h-[960px] p-8 sm:p-12 bg-white dark:bg-[#18181b] border border-gray-200 dark:border-slate-800 shadow-md rounded-xs relative"
+                  >
+                    <div className="flex items-center justify-between pb-2 mb-4 border-b border-gray-100 dark:border-slate-800 text-[11px] text-gray-400 select-none">
+                      <span className="font-medium truncate max-w-[240px]">{paste.title || "Word Document"}</span>
+                      <span className="font-semibold text-gray-500 dark:text-gray-400">Page {pIndex + 1} of {docPages.length}</span>
+                    </div>
+                    <div
+                      dangerouslySetInnerHTML={{ __html: pageHtml }}
+                      className="word-editor-canvas min-h-[820px]"
+                    />
+                    <div className="flex items-center justify-center pt-3 mt-4 border-t border-gray-100 dark:border-slate-800 text-[11px] text-gray-400 select-none">
+                      <span>Page {pIndex + 1} of {docPages.length}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          }
+
           return (
             <div
               dangerouslySetInnerHTML={{ __html: paste.content || "" }}

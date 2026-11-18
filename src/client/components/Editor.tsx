@@ -35,6 +35,7 @@ import {
 } from "lucide-react";
 import katex from "katex";
 import * as mammoth from "mammoth";
+import { parseDocxBuffer } from "../utils/wordParser.js";
 import { CodeCompilerModal } from "./CodeCompilerModal.js";
 import { WordDocEditor } from "./WordDocEditor.js";
 
@@ -316,9 +317,9 @@ export const Editor: React.FC<EditorProps> = ({
     try {
       if (lowerName.endsWith(".docx")) {
         const arrayBuffer = await file.arrayBuffer();
-        const result = await mammoth.convertToHtml({ arrayBuffer });
-        if (result.value && editorRef.current) {
-          editorRef.current.innerHTML = result.value;
+        const html = await parseDocxBuffer(arrayBuffer);
+        if (html && editorRef.current) {
+          editorRef.current.innerHTML = html;
           updateStats();
         } else {
           alert("Could not extract text from this Word document.");
