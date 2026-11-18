@@ -19,6 +19,7 @@ interface NavbarProps {
   onOpenAuth: () => void;
   onOpenQuickCode: () => void;
   onOpenDuoPaste: (tab?: "start" | "join") => void;
+  onOpenWordDoc?: () => void;
   onLogout: () => void;
   onNavigateHome: () => void;
   onNavigateDashboard: () => void;
@@ -32,6 +33,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenAuth,
   onOpenQuickCode,
   onOpenDuoPaste,
+  onOpenWordDoc,
   onLogout,
   onNavigateHome,
   onNavigateDashboard,
@@ -82,6 +84,20 @@ export const Navbar: React.FC<NavbarProps> = ({
             <PlusCircle className="w-4 h-4" />
             <span className="hidden sm:inline">New Paste</span>
           </button>
+
+          {/* Word Doc Editor Mode CTA */}
+          {onOpenWordDoc && (
+            <button
+              type="button"
+              onClick={onOpenWordDoc}
+              aria-label="Create new Word document"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white shadow-xs transition cursor-pointer"
+              title="Open full Microsoft Word live document editor"
+            >
+              <FileText className="w-4 h-4" />
+              <span className="font-semibold text-xs tracking-tight">Word Doc</span>
+            </button>
+          )}
 
           {/* DuoPaste Live Collaboration Button */}
           <button

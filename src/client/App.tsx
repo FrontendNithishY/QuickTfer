@@ -70,6 +70,7 @@ export const App: React.FC = () => {
   const [activeDuoSession, setActiveDuoSession] = useState<DuoSession | null>(null);
   const [duoClientId, setDuoClientId] = useState<string>("");
   const [duoRole, setDuoRole] = useState<"host" | "guest">("host");
+  const [editorInitialMode, setEditorInitialMode] = useState<"standard" | "word">("standard");
 
 
   // Sync theme
@@ -162,6 +163,14 @@ export const App: React.FC = () => {
         setView("quick-code");
       } else if (path === "/math-notes") {
         setView("math-notes");
+      } else if (path === "/word") {
+        setEditorInitialMode("word");
+        setView("editor");
+        updateSEO({
+          title: "Word Document Editor - SharePaste",
+          description: "Live Microsoft Word document editor with full ribbon options, font styles, colors, tables, and .docx export.",
+          canonicalPath: "/word"
+        });
       } else if (path === "/" || path === "") {
         setView("editor");
         updateSEO({
@@ -301,8 +310,15 @@ export const App: React.FC = () => {
           setDuoModalTab(tab);
           setIsDuoModalOpen(true);
         }}
+        onOpenWordDoc={() => {
+          setEditorInitialMode("word");
+          navigateTo("editor", "/word");
+        }}
         onLogout={handleLogout}
-        onNavigateHome={() => navigateTo("editor", "/")}
+        onNavigateHome={() => {
+          setEditorInitialMode("standard");
+          navigateTo("editor", "/");
+        }}
         onNavigateDashboard={() => navigateTo("dashboard", "/dashboard")}
         onNavigateProfile={(un) => {
           setProfileUsername(un);
@@ -315,8 +331,10 @@ export const App: React.FC = () => {
       <main className="flex-1 flex flex-col">
         {view === "editor" && (
           <Editor
+            key={`${forkDraft?.title}-${forkDraft?.content}-${editorInitialMode}`}
             initialTitle={forkDraft?.title || ""}
             initialContent={forkDraft?.content || ""}
+            initialMode={editorInitialMode}
             onPublishClick={handleOpenPublish}
             onPublishSuccess={(slug) => {
               setCurrentSlug(slug);

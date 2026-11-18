@@ -378,8 +378,61 @@ print(f"Total: {metrics['total']} | Average: {metrics['mean']:.2f} | Status: {me
     assert.ok(getSharedPaste.content.includes("Second paragraph added by User B."));
     console.log(`✓ Shared DuoPaste frozen and published to permanent paste: /p/${pubDuoData.slug}`);
 
+    // 15. Test Word Document Live Formatting Preservation & Publishing
+    console.log("[Test 15] Testing Word Document Live Formatting Preservation & Publishing...");
+    const sampleWordDocContent = `
+      <h1 style="font-family: 'Calibri Light', sans-serif; font-size: 20pt; color: #1f497d; font-weight: bold;">Quarterly Business Review</h1>
+      <p style="font-family: Calibri, sans-serif; font-size: 11pt; line-height: 1.15; color: #000000;">
+        This document was created in the <strong>SharePaste Word Document Editor</strong> featuring classic Microsoft Office formatting.
+      </p>
+      <p style="font-family: Calibri, sans-serif; font-size: 11pt;">
+        Here is text with <span style="background-color: #ffff00;">Yellow Word Highlighter</span> and text with <span style="color: #c00000; font-weight: bold;">Dark Red Accent Color</span>.
+      </p>
+      <table style="width: 100%; border-collapse: collapse; margin: 16px 0; border: 1px solid #94a3b8;">
+        <thead>
+          <tr>
+            <th style="border: 1px solid #94a3b8; background-color: #f1f5f9; padding: 8px 12px; font-weight: bold;">Project Milestone</th>
+            <th style="border: 1px solid #94a3b8; background-color: #f1f5f9; padding: 8px 12px; font-weight: bold;">Owner</th>
+            <th style="border: 1px solid #94a3b8; background-color: #f1f5f9; padding: 8px 12px; font-weight: bold;">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="border: 1px solid #cbd5e1; padding: 8px 12px;">Word Document Mode</td>
+            <td style="border: 1px solid #cbd5e1; padding: 8px 12px;">Engineering</td>
+            <td style="border: 1px solid #cbd5e1; padding: 8px 12px; color: #00b050; font-weight: bold;">Completed</td>
+          </tr>
+        </tbody>
+      </table>
+      <div style="border-left: 4px solid #0284c7; background-color: #f0f9ff; padding: 12px 16px; margin: 16px 0;">
+        <p style="margin: 0; font-weight: 600; color: #0369a1;">Word Callout Box Note:</p>
+        <p style="margin: 4px 0 0 0; color: #334155;">Full Word formatting suite active.</p>
+      </div>
+    `;
+
+    const wordPasteRes = await fetch(`${baseUrl}/api/pastes`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: "Q3 Executive Summary (Word Document)",
+        content: sampleWordDocContent,
+        visibility: "public"
+      })
+    });
+    assert.strictEqual(wordPasteRes.status, 201, "Word doc should publish with 201");
+    const wordPasteData = await wordPasteRes.json() as any;
+    assert.ok(wordPasteData.slug, "Slug must be generated for Word document");
+
+    const getWordPaste = await (await fetch(`${baseUrl}/api/pastes/${wordPasteData.slug}`)).json() as any;
+    assert.strictEqual(getWordPaste.title, "Q3 Executive Summary (Word Document)");
+    assert.ok(getWordPaste.content.includes("font-family: 'Calibri Light'"));
+    assert.ok(getWordPaste.content.includes("background-color: #ffff00"));
+    assert.ok(getWordPaste.content.includes("Quarterly Business Review"));
+    assert.ok(getWordPaste.content.includes("Project Milestone"));
+    console.log(`✓ Word document styling, tables, fonts, and highlights preserved on /p/${wordPasteData.slug}`);
+
     console.log("\n=======================================================");
-    console.log("🎉 ALL AUTOMATED TESTS PASSED SUCCESSFULLY! (14/14) 🎉");
+    console.log("🎉 ALL AUTOMATED TESTS PASSED SUCCESSFULLY! (15/15) 🎉");
     console.log("=======================================================\n");
 
 

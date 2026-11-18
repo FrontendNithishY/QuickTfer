@@ -30,14 +30,17 @@ import {
   ExternalLink,
   Check,
   Terminal,
-  Users
+  Users,
+  FileText
 } from "lucide-react";
 import katex from "katex";
 import { CodeCompilerModal } from "./CodeCompilerModal.js";
+import { WordDocEditor } from "./WordDocEditor.js";
 
 interface EditorProps {
   initialTitle?: string;
   initialContent?: string;
+  initialMode?: "standard" | "word";
   onPublishClick: (title: string, content: string) => void;
   onPublishSuccess?: (slug: string) => void;
   onStartDuoPaste?: () => void;
@@ -46,18 +49,39 @@ interface EditorProps {
 export const Editor: React.FC<EditorProps> = ({
   initialTitle = "",
   initialContent = "",
+  initialMode = "standard",
   onPublishClick,
   onPublishSuccess,
   onStartDuoPaste,
 }) => {
 
   const [title, setTitle] = useState(initialTitle);
+  const [mode, setMode] = useState<"standard" | "word">(initialMode || "standard");
+  const [draftContent, setDraftContent] = useState(initialContent);
   const [wordCount, setWordCount] = useState(0);
   const [charCount, setCharCount] = useState(0);
   const [readingTime, setReadingTime] = useState("0 min");
   const editorRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const docInputRef = useRef<HTMLInputElement>(null);
+
+  const handleSwitchToWord = () => {
+    const current = editorRef.current?.innerHTML || draftContent;
+    setDraftContent(current);
+    setMode("word");
+  };
+
+  const handleSwitchToStandard = (newTitle?: string, newContent?: string) => {
+    if (newTitle !== undefined) setTitle(newTitle);
+    if (newContent !== undefined) {
+      setDraftContent(newContent);
+      if (editorRef.current) {
+        editorRef.current.innerHTML = newContent;
+        updateStats();
+      }
+    }
+    setMode("standard");
+  };
 
   // AI Polish states
   const [isPolishing, setIsPolishing] = useState(false);
@@ -311,11 +335,57 @@ export const Editor: React.FC<EditorProps> = ({
     onPublishClick(title, content);
   };
 
+  if (mode === "word") {
+    return (
+      <div className="flex-1 flex flex-col w-full min-h-[calc(100vh-64px)]">
+        <WordDocEditor
+          initialTitle={title}
+          initialContent={editorRef.current?.innerHTML || draftContent}
+          onPublishClick={(docTitle, docContent) => {
+            setTitle(docTitle);
+            setDraftContent(docContent);
+            onPublishClick(docTitle, docContent);
+          }}
+          onSwitchToStandard={() => {
+            handleSwitchToStandard();
+          }}
+          onStartDuoPaste={onStartDuoPaste}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 flex-1 flex flex-col w-full">
       {/* Container Box */}
       <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-xl border border-gray-200/80 dark:border-slate-800 flex flex-col overflow-hidden transition-colors flex-1">
         
+        {/* Editor Mode Switcher Bar */}
+        <div className="px-6 sm:px-8 pt-5 pb-2 flex items-center justify-between border-b border-gray-100 dark:border-slate-800/60 bg-gray-50/50 dark:bg-slate-800/20">
+          <div className="flex items-center gap-1.5 p-1 bg-gray-100 dark:bg-slate-800 rounded-xl text-xs font-semibold">
+            <button
+              type="button"
+              onClick={() => setMode("standard")}
+              className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white shadow-xs cursor-pointer"
+            >
+              <span>📝 Quick Note</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleSwitchToWord}
+              className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition cursor-pointer"
+            >
+              <FileText className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+              <span>Word Document</span>
+              <span className="px-1.5 py-0.5 text-[9px] bg-blue-600 text-white rounded font-bold uppercase tracking-wider">MS Office</span>
+            </button>
+          </div>
+
+          <div className="text-xs text-gray-400 hidden sm:block">
+            <span>Microsoft Word mode with full ribbon & typography</span>
+          </div>
+        </div>
+
         {/* Title Input */}
         <div className="px-6 sm:px-8 pt-6 pb-3 border-b border-gray-100 dark:border-slate-800">
           <input
@@ -597,6 +667,17 @@ export const Editor: React.FC<EditorProps> = ({
                 <span>Start DuoPaste</span>
               </button>
             )}
+
+            {/* Word Document Live Mode Button */}
+            <button
+              type="button"
+              onClick={handleSwitchToWord}
+              className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100/80 dark:hover:bg-blue-900/60 border border-blue-300 dark:border-blue-800 rounded-lg shadow-sm transition cursor-pointer"
+              title="Word Document: Full Microsoft Word Ribbon with fonts, colors, and layout"
+            >
+              <FileText className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+              <span>Word Doc</span>
+            </button>
 
             {/* Code Highlighted Compiler & Formatter Button (Left of AI Polish) */}
             <button

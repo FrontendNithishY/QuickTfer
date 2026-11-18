@@ -256,6 +256,35 @@ export const PasteView: React.FC<PasteViewProps> = ({
     setDownloadMenu(false);
   };
 
+  const downloadDocx = () => {
+    if (!paste || !paste.content) return;
+    const docHtml = `
+      <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+      <head>
+        <meta charset='utf-8'>
+        <title>${paste.title || "Document"}</title>
+        <style>
+          @page { size: 21cm 29.7cm; margin: 1in; }
+          body { font-family: Calibri, 'Segoe UI', Arial, sans-serif; font-size: 11pt; line-height: 1.15; color: #000000; }
+          table { border-collapse: collapse; width: 100%; margin: 12pt 0; }
+          th, td { border: 1px solid #7f7f7f; padding: 6pt; }
+        </style>
+      </head>
+      <body>
+        <h1>${paste.title || "Document"}</h1>
+        ${paste.content}
+      </body>
+      </html>
+    `;
+    const blob = new Blob([docHtml], { type: "application/msword;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${paste.slug}.doc`;
+    a.click();
+    setDownloadMenu(false);
+  };
+
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center py-20">
@@ -383,6 +412,13 @@ export const PasteView: React.FC<PasteViewProps> = ({
 
               {downloadMenu && (
                 <div className="absolute left-0 mt-2 w-44 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-gray-100 dark:border-slate-700 py-1 z-50">
+                  <button
+                    onClick={downloadDocx}
+                    className="w-full text-left px-3 py-2 text-xs text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-slate-700 flex items-center gap-2 font-medium"
+                  >
+                    <FileText className="w-3.5 h-3.5 text-blue-600" />
+                    Word Document (.doc)
+                  </button>
                   <button
                     onClick={() => { window.print(); setDownloadMenu(false); }}
                     className="w-full text-left px-3 py-2 text-xs text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-slate-700 flex items-center gap-2"
