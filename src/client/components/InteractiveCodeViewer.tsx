@@ -20,44 +20,9 @@ interface InteractiveCodeViewerProps {
   onShare?: () => void;
 }
 
-export const highlightCodeTokens = (raw: string): string => {
-  const escaped = raw
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+import { highlightCodeTokens } from "../utils/syntaxHighlight.js";
+export { highlightCodeTokens };
 
-  // Strings (emerald green)
-  let result = escaped.replace(
-    /(["'`].*?["'`])/g,
-    '<span class="token-string" style="color:#4ade80;">$1</span>'
-  );
-
-  // Comments (smoke gray)
-  result = result.replace(
-    /(\/\/.*$|#.*$|\/\*[\s\S]*?\*\/|--.*$)/gm,
-    '<span class="token-comment" style="color:#71717a;font-style:italic;">$1</span>'
-  );
-
-  // Keywords & Control Flow: def, if, else, elif, for, while, return, class, etc. (vibrant coral pink #f43f5e)
-  result = result.replace(
-    /\b(def|class|if|else|elif|for|while|return|function|const|let|var|import|from|export|async|await|try|except|finally|lambda|yield|pass|break|continue|in|is|not|and|or|type|interface|public|private|static|void|fn)\b/g,
-    '<span class="token-keyword" style="color:#f43f5e;font-weight:700;">$1</span>'
-  );
-
-  // Built-in Functions & Methods: print, len, sum, range, console.log, alert, int, str (electric cyan #38bdf8)
-  result = result.replace(
-    /\b(print|len|sum|range|min|max|abs|round|enumerate|zip|map|filter|input|open|isinstance|int|float|str|list|dict|set|tuple|bool|super|console|log|info|warn|error|alert|prompt|confirm|setTimeout|setInterval|parseInt|parseFloat|Math|JSON|stringify|parse)\b/g,
-    '<span class="token-builtin" style="color:#38bdf8;font-weight:600;">$1</span>'
-  );
-
-  // Numbers & Booleans: True, False, None, true, false, digits (warm amber #fb923c)
-  result = result.replace(
-    /\b(True|False|None|true|false|null|undefined|\d+)\b/g,
-    '<span class="token-number" style="color:#fb923c;">$1</span>'
-  );
-
-  return result;
-};
 
 export const InteractiveCodeViewer: React.FC<InteractiveCodeViewerProps> = ({
   initialCode,

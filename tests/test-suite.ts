@@ -7,6 +7,8 @@ import pastesRouter from "../src/server/routes/pastes.js";
 import quickShareRouter from "../src/server/routes/quickShare.js";
 import uploadRouter from "../src/server/routes/upload.js";
 import aiRouter from "../src/server/routes/ai.js";
+import { highlightCodeTokens } from "../src/client/utils/syntaxHighlight.js";
+
 
 const app = express();
 app.use(express.json());
@@ -266,9 +268,46 @@ async function runTests() {
     assert.ok(parsedPayload.output.includes("42"));
     console.log("✓ Direct interactive compiler code paste published and verified.");
 
+    // 13. Test Single-Pass Code Syntax Highlighting Engine
+    console.log("[Test 13] Testing Single-Pass Code Syntax Highlighting Engine...");
+    const samplePython = `# Python - Clean data summary & functions
+def calculate_metrics(values):
+    total = sum(values)
+    mean = total / len(values)
+    if mean > 50:
+        status = "High Performance"
+    else:
+        status = "Normal"
+    return {"total": total, "mean": mean, "status": status}
+
+data = [15, 28, 42, 65, 89, 93, 104]
+print("Input values:", data)
+metrics = calculate_metrics(data)
+print(f"Total: {metrics['total']} | Average: {metrics['mean']:.2f} | Status: {metrics['status']}")`;
+
+    const tokenizedHtml = highlightCodeTokens(samplePython);
+    // Must NOT contain mangled attributes or regex collision artifacts
+    assert.ok(!tokenizedHtml.includes("700;>"), "No 700;> leakage in tokenized html");
+    assert.ok(!tokenizedHtml.includes("600;>"), "No 600;> leakage in tokenized html");
+    assert.ok(!tokenizedHtml.includes('class="token-string" style="color:'), "No corrupted style attributes");
+    assert.ok(!tokenizedHtml.includes('class="token-comment" style="color:'), "No corrupted comment style attributes");
+
+    // Must correctly highlight tokens
+    assert.ok(tokenizedHtml.includes('<span class="token-keyword">def</span>'), "def keyword present");
+    assert.ok(tokenizedHtml.includes('<span class="token-keyword">if</span>'), "if keyword present");
+    assert.ok(tokenizedHtml.includes('<span class="token-keyword">else</span>'), "else keyword present");
+    assert.ok(tokenizedHtml.includes('<span class="token-keyword">return</span>'), "return keyword present");
+    assert.ok(tokenizedHtml.includes('<span class="token-builtin">print</span>'), "print builtin present");
+    assert.ok(tokenizedHtml.includes('<span class="token-builtin">sum</span>'), "sum builtin present");
+    assert.ok(tokenizedHtml.includes('<span class="token-builtin">len</span>'), "len builtin present");
+    assert.ok(tokenizedHtml.includes('<span class="token-comment"># Python - Clean data summary &amp; functions</span>'), "comment formatted properly");
+    assert.ok(tokenizedHtml.includes('<span class="token-string">"High Performance"</span>'), "string formatted properly");
+    console.log("✓ Single-pass syntax highlighting engine verified with zero tag leakage.");
+
     console.log("\n=======================================================");
-    console.log("🎉 ALL AUTOMATED TESTS PASSED SUCCESSFULLY! (12/12) 🎉");
+    console.log("🎉 ALL AUTOMATED TESTS PASSED SUCCESSFULLY! (13/13) 🎉");
     console.log("=======================================================\n");
+
   } finally {
     server.close();
   }
