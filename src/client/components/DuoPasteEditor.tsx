@@ -29,14 +29,17 @@ import {
   Share2,
   ExternalLink,
   ShieldCheck,
-  Zap
+  Zap,
+  FileText
 } from "lucide-react";
 import { DuoSession } from "../types.js";
+import { WordDocEditor } from "./WordDocEditor.js";
 
 interface DuoPasteEditorProps {
   initialSession: DuoSession;
   clientId: string;
   role: "host" | "guest";
+  initialMode?: "standard" | "word";
   onLeave: () => void;
   onPublishSuccess: (slug: string) => void;
 }
@@ -45,10 +48,19 @@ export const DuoPasteEditor: React.FC<DuoPasteEditorProps> = ({
   initialSession,
   clientId,
   role,
+  initialMode,
   onLeave,
   onPublishSuccess
 }) => {
   const [session, setSession] = useState<DuoSession>(initialSession);
+  const [editorMode, setEditorMode] = useState<"standard" | "word">(() => {
+    if (initialMode) return initialMode;
+    if (typeof window !== "undefined") {
+      const sp = new URLSearchParams(window.location.search);
+      if (sp.get("mode") === "word") return "word";
+    }
+    return "standard";
+  });
   const [title, setTitle] = useState(initialSession.title || "Untitled DuoPaste");
   const [copiedPin, setCopiedPin] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
@@ -86,6 +98,7 @@ export const DuoPasteEditor: React.FC<DuoPasteEditorProps> = ({
 
   // Real-Time Server-Sent Events (SSE) Stream
   useEffect(() => {
+    if (editorMode === "word") return; // WordDocEditor handles its own collaborative SSE connection
     const sseUrl = `/api/duo/stream/${session.pin}?clientId=${clientId}`;
     const eventSource = new EventSource(sseUrl);
 
@@ -165,7 +178,7 @@ export const DuoPasteEditor: React.FC<DuoPasteEditorProps> = ({
       eventSource.close();
       clearInterval(pollInterval);
     };
-  }, [session.pin, clientId]);
+  }, [session.pin, clientId, editorMode]);
 
   // Dispatch local mutations to server
   const queueSync = () => {
@@ -311,6 +324,27 @@ export const DuoPasteEditor: React.FC<DuoPasteEditorProps> = ({
     setTimeout(() => setCopiedLink(false), 2000);
   };
 
+  if (editorMode === "word") {
+    return (
+      <div className="w-full flex-1 flex flex-col">
+        <WordDocEditor
+          initialTitle={title}
+          initialContent={editorRef.current?.innerHTML || session.content || ""}
+          onPublishClick={(pubTitle, pubContent) => {
+            setTitle(pubTitle);
+            handlePublishShared();
+          }}
+          onSwitchToStandard={() => setEditorMode("standard")}
+          collabSession={session}
+          clientId={clientId}
+          role={role}
+          onLeaveCollab={onLeave}
+          onPublishSuccess={onPublishSuccess}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="w-full max-w-4xl mx-auto px-4 py-4 sm:py-6">
       {/* Collaboration Status Topbar */}
@@ -344,6 +378,17 @@ export const DuoPasteEditor: React.FC<DuoPasteEditorProps> = ({
               {collaboratorsCount > 1 ? "2 Online (Host & Guest)" : "1 Online (Waiting for guest...)"}
             </span>
           </div>
+
+          {/* Switch to Word Document Mode */}
+          <button
+            type="button"
+            onClick={() => setEditorMode("word")}
+            className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-900/60 hover:bg-blue-100 dark:hover:bg-blue-900/60 transition cursor-pointer"
+            title="Switch DuoPaste live session to Microsoft Word Document Mode"
+          >
+            <FileText className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+            <span className="hidden sm:inline">Word Document</span>
+          </button>
         </div>
 
         {/* Right: Sync Status & Actions */}

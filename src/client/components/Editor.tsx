@@ -34,6 +34,7 @@ import {
   FileText
 } from "lucide-react";
 import katex from "katex";
+import * as mammoth from "mammoth";
 import { CodeCompilerModal } from "./CodeCompilerModal.js";
 import { WordDocEditor } from "./WordDocEditor.js";
 
@@ -306,24 +307,45 @@ export const Editor: React.FC<EditorProps> = ({
     exec("insertHTML", tableHtml);
   };
 
-  // Import Document (.txt or .md)
-  const handleDocImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Import Document (.docx, .txt, .md, .html)
+  const handleDocImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const rawText = event.target?.result as string;
-      if (rawText && editorRef.current) {
-        const formatted = rawText
+    if (!file || !editorRef.current) return;
+    const lowerName = file.name.toLowerCase();
+
+    try {
+      if (lowerName.endsWith(".docx")) {
+        const arrayBuffer = await file.arrayBuffer();
+        const result = await mammoth.convertToHtml({ arrayBuffer });
+        if (result.value && editorRef.current) {
+          editorRef.current.innerHTML = result.value;
+          updateStats();
+        } else {
+          alert("Could not extract text from this Word document.");
+        }
+      } else if (lowerName.endsWith(".html") || lowerName.endsWith(".htm") || lowerName.endsWith(".doc")) {
+        const text = await file.text();
+        if (text.includes("<html") || text.includes("<body") || text.includes("<p>")) {
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(text, "text/html");
+          editorRef.current.innerHTML = doc.body.innerHTML || text;
+        } else {
+          editorRef.current.innerHTML = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>");
+        }
+        updateStats();
+      } else {
+        const text = await file.text();
+        editorRef.current.innerHTML = text
           .replace(/&/g, "&amp;")
           .replace(/</g, "&lt;")
           .replace(/>/g, "&gt;")
           .replace(/\n/g, "<br>");
-        editorRef.current.innerHTML = formatted;
         updateStats();
       }
-    };
-    reader.readAsText(file);
+    } catch (err) {
+      console.error("Document import error:", err);
+      alert("Failed to parse Word document. Please ensure it is a valid .docx file.");
+    }
   };
 
   const handlePublish = () => {
@@ -598,8 +620,8 @@ export const Editor: React.FC<EditorProps> = ({
             type="button"
             onClick={() => docInputRef.current?.click()}
             className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-700"
-            title="Import text (.txt / .md)"
-            aria-label="Import text or markdown file"
+            title="Import document (.docx / .txt / .md)"
+            aria-label="Import Word or text document"
           >
             <FileUp className="w-4 h-4" />
           </button>
@@ -607,7 +629,7 @@ export const Editor: React.FC<EditorProps> = ({
             type="file"
             ref={docInputRef}
             onChange={handleDocImport}
-            accept=".txt,.md"
+            accept=".docx,.doc,.txt,.md,.html,.htm"
             className="hidden"
             aria-hidden="true"
           />

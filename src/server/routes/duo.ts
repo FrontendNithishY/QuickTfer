@@ -163,12 +163,15 @@ router.post("/duo/sync", (req, res) => {
     const cleanPin = String(pin).trim().replace(/\s+/g, "");
     const now = Date.now();
 
-    // Increment version and save content
+    // Increment version and save content (preserving existing title/content if omitted)
+    const titleVal = title !== undefined ? title : null;
+    const contentVal = content !== undefined ? content : null;
+
     db.prepare(`
       UPDATE duo_sessions
-      SET title = ?, content = ?, version = version + 1, last_active_at = ?
+      SET title = COALESCE(?, title), content = COALESCE(?, content), version = version + 1, last_active_at = ?
       WHERE pin = ?
-    `).run(title || "Untitled DuoPaste", content || "", now, cleanPin);
+    `).run(titleVal, contentVal, now, cleanPin);
 
     const updated = db.prepare(`
       SELECT pin, title, content, version, host_client_id, guest_client_id, last_active_at

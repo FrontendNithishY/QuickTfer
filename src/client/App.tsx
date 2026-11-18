@@ -126,6 +126,8 @@ export const App: React.FC = () => {
           .catch(() => setView("editor"));
       } else if (path.startsWith("/duo/")) {
         const pin = path.slice(5).trim();
+        const searchParams = new URLSearchParams(window.location.search);
+        const mode = searchParams.get("mode");
         if (pin) {
           fetch("/api/duo/join", {
             method: "POST",
@@ -138,6 +140,9 @@ export const App: React.FC = () => {
                 setActiveDuoSession(data.session);
                 setDuoClientId(data.clientId);
                 setDuoRole("guest");
+                if (mode === "word") {
+                  setEditorInitialMode("word");
+                }
                 setView("duo");
               } else {
                 alert(data.error || "DuoPaste session not found or expired.");
@@ -352,6 +357,7 @@ export const App: React.FC = () => {
             initialSession={activeDuoSession}
             clientId={duoClientId}
             role={duoRole}
+            initialMode={editorInitialMode}
             onLeave={() => {
               setActiveDuoSession(null);
               navigateTo("editor", "/");

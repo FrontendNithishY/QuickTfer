@@ -48,9 +48,15 @@ import {
   Layout,
   Minus,
   Sigma,
-  ArrowRight
+  Users,
+  Radio,
+  ExternalLink,
+  QrCode
 } from "lucide-react";
 import katex from "katex";
+import * as mammoth from "mammoth";
+import QRCode from "qrcode";
+import { DuoSession } from "../types.js";
 
 export interface WordDocEditorProps {
   initialTitle?: string;
@@ -58,6 +64,12 @@ export interface WordDocEditorProps {
   onPublishClick: (title: string, content: string) => void;
   onSwitchToStandard?: () => void;
   onStartDuoPaste?: () => void;
+  // Live Collaboration Props
+  collabSession?: DuoSession | null;
+  clientId?: string;
+  role?: "host" | "guest";
+  onLeaveCollab?: () => void;
+  onPublishSuccess?: (slug: string) => void;
 }
 
 // Classic Microsoft Office Theme Colors (10 color families x 6 brightness levels)
@@ -121,7 +133,12 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
   initialContent = "",
   onPublishClick,
   onSwitchToStandard,
-  onStartDuoPaste
+  onStartDuoPaste,
+  collabSession: propCollabSession = null,
+  clientId: propClientId = "",
+  role: propRole = "host",
+  onLeaveCollab,
+  onPublishSuccess
 }) => {
   const [title, setTitle] = useState(initialTitle || "Document1");
   const [activeTab, setActiveTab] = useState<"file" | "home" | "insert" | "layout" | "review" | "view">("home");
@@ -173,6 +190,26 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
     textDecoration?: string;
   } | null>(null);
 
+  // Word Collab Live State
+  const [collabSession, setCollabSession] = useState<DuoSession | null>(propCollabSession || null);
+  const [clientId, setClientId] = useState<string>(
+    propClientId || Math.random().toString(36).slice(2, 10)
+  );
+  const [role, setRole] = useState<"host" | "guest">(propRole || "host");
+  const [collaboratorsCount, setCollaboratorsCount] = useState<number>(
+    propCollabSession?.guest_client_id ? 2 : 1
+  );
+  const [syncStatus, setSyncStatus] = useState<"synced" | "saving" | "offline">("synced");
+  const [lastRemoteUpdate, setLastRemoteUpdate] = useState<string | null>(null);
+  const [showCollabModal, setShowCollabModal] = useState(false);
+  const [collabTab, setCollabTab] = useState<"start" | "join">("start");
+  const [collabJoinPin, setCollabJoinPin] = useState("");
+  const [isJoiningCollab, setIsJoiningCollab] = useState(false);
+  const [joinCollabError, setJoinCollabError] = useState<string | null>(null);
+  const [collabQrUrl, setCollabQrUrl] = useState<string>("");
+  const [copiedCollabPin, setCopiedCollabPin] = useState(false);
+  const [copiedCollabLink, setCopiedCollabLink] = useState(false);
+
   // Statistics
   const [wordCount, setWordCount] = useState(0);
   const [charCount, setCharCount] = useState(0);
@@ -184,6 +221,10 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
   const canvasRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const docxInputRef = useRef<HTMLInputElement>(null);
+  const titleRef = useRef(title);
+  titleRef.current = title;
+  const syncTimeoutRef = useRef<any>(null);
+  const isApplyingRemoteRef = useRef(false);
 
   // Initialize content
   useEffect(() => {
@@ -196,6 +237,15 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
   useEffect(() => {
     if (initialTitle) setTitle(initialTitle);
   }, [initialTitle]);
+
+  useEffect(() => {
+    if (propCollabSession) {
+      setCollabSession(propCollabSession);
+      if (propClientId) setClientId(propClientId);
+      if (propRole) setRole(propRole);
+      setCollaboratorsCount(propCollabSession.guest_client_id ? 2 : 1);
+    }
+  }, [propCollabSession, propClientId, propRole]);
 
   const updateStats = () => {
     if (!canvasRef.current) return;
@@ -217,11 +267,145 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
     setSavedTime("Saved to browser");
   };
 
+  // Queue Live Sync across User A and User B
+  const queueCollabSync = () => {
+    if (!collabSession || isApplyingRemoteRef.current) return;
+    setSyncStatus("saving");
+
+    if (syncTimeoutRef.current) {
+      clearTimeout(syncTimeoutRef.current);
+    }
+
+    syncTimeoutRef.current = setTimeout(async () => {
+      try {
+        const currentHtml = canvasRef.current ? canvasRef.current.innerHTML : "";
+        const res = await fetch("/api/duo/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            pin: collabSession.pin,
+            clientId,
+            title: titleRef.current,
+            content: currentHtml,
+            version: (collabSession.version || 1) + 1
+          })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.session) setCollabSession(data.session);
+          setSyncStatus("synced");
+        }
+      } catch {
+        setSyncStatus("offline");
+      }
+    }, 180);
+  };
+
+  // Real-Time Server-Sent Events (SSE) Stream for Word Collab
+  useEffect(() => {
+    if (!collabSession) return;
+
+    const sseUrl = `/api/duo/stream/${collabSession.pin}?clientId=${clientId}`;
+    const eventSource = new EventSource(sseUrl);
+
+    eventSource.onopen = () => {
+      setSyncStatus("synced");
+    };
+
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+
+        if (data.type === "presence") {
+          if (data.clientsCount) {
+            setCollaboratorsCount(data.clientsCount);
+          }
+        } else if (data.type === "collaborator_joined") {
+          setCollaboratorsCount(2);
+          setLastRemoteUpdate("Collaborator joined!");
+          setTimeout(() => setLastRemoteUpdate(null), 3000);
+        } else if (data.type === "sync") {
+          // If update came from the other collaborator
+          if (data.senderId !== clientId) {
+            setLastRemoteUpdate(role === "host" ? "User B is typing..." : "User A is typing...");
+            setTimeout(() => setLastRemoteUpdate(null), 2000);
+
+            if (data.title !== undefined && data.title !== titleRef.current) {
+              setTitle(data.title);
+            }
+
+            if (data.content !== undefined && canvasRef.current) {
+              const currentLocalHtml = canvasRef.current.innerHTML;
+              if (currentLocalHtml !== data.content) {
+                isApplyingRemoteRef.current = true;
+                canvasRef.current.innerHTML = data.content;
+                updateStats();
+                isApplyingRemoteRef.current = false;
+              }
+            }
+          }
+        } else if (data.type === "published") {
+          if (data.slug) {
+            try {
+              sessionStorage.setItem(`sharepaste_cache_${data.slug}`, JSON.stringify({
+                slug: data.slug,
+                title,
+                content: canvasRef.current?.innerHTML || "",
+                isEncrypted: false,
+                visibility: "public",
+                authorName: "Word Collab Collaborators",
+                createdAt: Date.now(),
+                updatedAt: Date.now()
+              }));
+            } catch {}
+            if (onPublishSuccess) {
+              onPublishSuccess(data.slug);
+            } else {
+              window.location.href = `/p/${data.slug}`;
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Word Collab SSE parse error:", err);
+      }
+    };
+
+    eventSource.onerror = () => {
+      setSyncStatus("offline");
+    };
+
+    // Polling fallback every 2.5s for resilient sync across serverless containers
+    const pollInterval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/duo/${collabSession.pin}`);
+        if (res.ok) {
+          const fresh = await res.json();
+          if (fresh.session) {
+            setCollabSession(fresh.session);
+            if (fresh.session.guest_client_id) {
+              setCollaboratorsCount((prev) => Math.max(prev, 2));
+            }
+            if (fresh.session.published_slug) {
+              if (onPublishSuccess) onPublishSuccess(fresh.session.published_slug);
+              else window.location.href = `/p/${fresh.session.published_slug}`;
+            }
+          }
+        }
+      } catch {}
+    }, 2500);
+
+    return () => {
+      eventSource.close();
+      clearInterval(pollInterval);
+    };
+  }, [collabSession?.pin, clientId, role, onPublishSuccess]);
+
   const exec = (command: string, value: string | undefined = undefined) => {
     document.execCommand(command, false, value);
     if (canvasRef.current) {
       canvasRef.current.focus();
       updateStats();
+      queueCollabSync();
     }
   };
 
@@ -244,6 +428,7 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
     span.appendChild(range.extractContents());
     range.insertNode(span);
     updateStats();
+    queueCollabSync();
   };
 
   // Grow Font (+2pt)
@@ -298,6 +483,7 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
     const textNode = document.createTextNode(cleanText);
     range.insertNode(textNode);
     updateStats();
+    queueCollabSync();
   };
 
   // Apply Font Color
@@ -331,6 +517,7 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
     range.insertNode(span);
     setShowUnderlineMenu(false);
     updateStats();
+    queueCollabSync();
   };
 
   // Format Painter
@@ -375,6 +562,7 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
     range.insertNode(span);
     setFormatPainterStyle(null);
     updateStats();
+    queueCollabSync();
   };
 
   // Line Spacing
@@ -391,6 +579,7 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
       node = node.parentNode;
     }
     setShowLineSpacingMenu(false);
+    queueCollabSync();
   };
 
   // Paragraph Shading
@@ -407,34 +596,7 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
       }
       node = node.parentNode;
     }
-  };
-
-  // Paragraph Borders
-  const handleParagraphBorder = (borderType: "all" | "bottom" | "top" | "left" | "none") => {
-    const selection = window.getSelection();
-    if (!selection) return;
-    let node = selection.anchorNode;
-    while (node && node !== canvasRef.current) {
-      if (node instanceof HTMLElement && (node.tagName === "P" || node.tagName === "DIV")) {
-        if (borderType === "none") {
-          node.style.border = "none";
-        } else if (borderType === "all") {
-          node.style.border = "1px solid #94a3b8";
-          node.style.padding = "8px";
-        } else if (borderType === "bottom") {
-          node.style.borderBottom = "2px solid #0284c7";
-          node.style.paddingBottom = "4px";
-        } else if (borderType === "top") {
-          node.style.borderTop = "1px solid #cbd5e1";
-          node.style.paddingTop = "4px";
-        } else if (borderType === "left") {
-          node.style.borderLeft = "4px solid #2563eb";
-          node.style.paddingLeft = "8px";
-        }
-        break;
-      }
-      node = node.parentNode;
-    }
+    queueCollabSync();
   };
 
   // Quick Styles Application
@@ -452,6 +614,7 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
       }
     }
     setShowStylesMenu(false);
+    queueCollabSync();
   };
 
   // Insert Table via Grid Selection
@@ -556,6 +719,7 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
     canvasRef.current.innerHTML = newHtml;
     updateStats();
     handleFind();
+    queueCollabSync();
   };
 
   // Export as Word (.docx / Word HTML MIME)
@@ -601,38 +765,173 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
     window.print();
   };
 
-  // Import Document (.txt, .md, .html)
-  const handleDocImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Import Document (.docx, .doc, .html, .txt, .md) with Mammoth binary decoding
+  const handleDocImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !canvasRef.current) return;
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      const text = evt.target?.result as string;
-      if (text) {
-        if (file.name.endsWith(".html") || file.name.endsWith(".htm")) {
-          canvasRef.current!.innerHTML = text;
+    const lowerName = file.name.toLowerCase();
+
+    try {
+      if (lowerName.endsWith(".docx")) {
+        const arrayBuffer = await file.arrayBuffer();
+        const result = await mammoth.convertToHtml({ arrayBuffer });
+        if (result.value && canvasRef.current) {
+          canvasRef.current.innerHTML = result.value;
+          updateStats();
+          queueCollabSync();
         } else {
-          canvasRef.current!.innerHTML = text
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/\n/g, "<br>");
+          alert("Could not extract content from this Word document (.docx).");
+        }
+      } else if (lowerName.endsWith(".html") || lowerName.endsWith(".htm") || lowerName.endsWith(".doc")) {
+        const text = await file.text();
+        if (text.includes("<html") || text.includes("<body") || text.includes("<p>")) {
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(text, "text/html");
+          canvasRef.current.innerHTML = doc.body.innerHTML || text;
+        } else {
+          canvasRef.current.innerHTML = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>");
         }
         updateStats();
+        queueCollabSync();
+      } else {
+        const text = await file.text();
+        canvasRef.current.innerHTML = text
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/\n/g, "<br>");
+        updateStats();
+        queueCollabSync();
       }
-    };
-    reader.readAsText(file);
+    } catch (err) {
+      console.error("Document import error:", err);
+      alert("Failed to parse Word document. Please ensure it is a valid .docx file.");
+    }
   };
 
-  // Publish to SharePaste
-  const handlePublish = () => {
+  // Start Word Collab session
+  const handleStartWordCollab = async () => {
+    try {
+      const currentHtml = canvasRef.current ? canvasRef.current.innerHTML : "";
+      const res = await fetch("/api/duo/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: title || "Untitled Word Document",
+          content: currentHtml
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.session) {
+        setCollabSession(data.session);
+        setClientId(data.clientId);
+        setRole("host");
+        setCollaboratorsCount(1);
+        setSyncStatus("synced");
+
+        const inviteUrl = `${window.location.origin}/duo/${data.pin}?mode=word`;
+        try {
+          const qr = await QRCode.toDataURL(inviteUrl, {
+            width: 180,
+            margin: 1,
+            color: { dark: "#09090b", light: "#ffffff" }
+          });
+          setCollabQrUrl(qr);
+        } catch (e) {
+          console.warn("QR code error:", e);
+        }
+        setShowCollabModal(true);
+        setCollabTab("start");
+      }
+    } catch (err) {
+      console.error("Start Word Collab error:", err);
+      alert("Failed to start Word Collab session.");
+    }
+  };
+
+  // Join Word Collab session
+  const handleJoinWordCollab = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanPin = collabJoinPin.trim().replace(/\s+/g, "");
+    if (!cleanPin) {
+      setJoinCollabError("Please enter a 6-digit collaboration PIN.");
+      return;
+    }
+    setIsJoiningCollab(true);
+    setJoinCollabError(null);
+
+    try {
+      const res = await fetch("/api/duo/join", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pin: cleanPin })
+      });
+      const data = await res.json();
+      if (res.ok && data.session) {
+        setCollabSession(data.session);
+        setClientId(data.clientId);
+        setRole("guest");
+        setCollaboratorsCount(2);
+        if (data.session.title) setTitle(data.session.title);
+        if (data.session.content && canvasRef.current) {
+          canvasRef.current.innerHTML = data.session.content;
+          updateStats();
+        }
+        setShowCollabModal(false);
+      } else {
+        setJoinCollabError(data.error || "Session not found or expired.");
+      }
+    } catch (err) {
+      setJoinCollabError("Network error joining Word Collab.");
+    } finally {
+      setIsJoiningCollab(false);
+    }
+  };
+
+  // Publish (handles both local document and synchronized Word Collab)
+  const handlePublish = async () => {
     if (!canvasRef.current) return;
     const content = canvasRef.current.innerHTML || "";
     if (!content.trim() || content === "<p><br></p>") {
       alert("Please add some content to your Word document before publishing.");
       return;
     }
-    onPublishClick(title, content);
+
+    if (collabSession) {
+      try {
+        const res = await fetch("/api/duo/publish", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            pin: collabSession.pin,
+            visibility: "public"
+          })
+        });
+        const data = await res.json();
+        if (res.ok && data.slug) {
+          try {
+            sessionStorage.setItem(`sharepaste_cache_${data.slug}`, JSON.stringify({
+              slug: data.slug,
+              title,
+              content,
+              isEncrypted: false,
+              visibility: "public",
+              authorName: "Word Collab Collaborators",
+              createdAt: Date.now(),
+              updatedAt: Date.now()
+            }));
+          } catch {}
+          if (onPublishSuccess) onPublishSuccess(data.slug);
+          else onPublishClick(title, content);
+        } else {
+          alert(data.error || "Failed to publish shared Word document.");
+        }
+      } catch {
+        alert("Network error publishing shared Word document.");
+      }
+    } else {
+      onPublishClick(title, content);
+    }
   };
 
   // Paper styling depending on options
@@ -660,9 +959,9 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
   return (
     <div className="flex-1 flex flex-col w-full bg-[#f3f4f6] dark:bg-[#0f172a] select-none text-slate-800 dark:text-slate-200 transition-colors">
       
-      {/* 1. Word Header Bar (Title, Quick Access Toolbar, Mode Switcher) */}
-      <div className="h-11 bg-[#2b579a] dark:bg-[#1e3a8a] text-white px-4 flex items-center justify-between shadow-md shrink-0">
-        <div className="flex items-center gap-3">
+      {/* 1. Word Header Bar (Title, Quick Access Toolbar, Live Collab Bar, Mode Switcher) */}
+      <div className="h-11 bg-[#2b579a] dark:bg-[#1e3a8a] text-white px-3 sm:px-4 flex items-center justify-between shadow-md shrink-0">
+        <div className="flex items-center gap-2 sm:gap-3">
           {/* Word App Logo Badge */}
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 bg-blue-700/80 rounded flex items-center justify-center font-serif font-black text-sm tracking-tighter border border-white/20">
@@ -712,32 +1011,111 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
           </div>
 
           {/* Document Title Input */}
-          <div className="flex items-center ml-2">
+          <div className="flex items-center ml-1 sm:ml-2">
             <input
               type="text"
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="bg-transparent hover:bg-white/10 focus:bg-white/20 px-2 py-0.5 rounded text-xs sm:text-sm font-medium text-white outline-none w-40 sm:w-64 transition"
+              onChange={(e) => {
+                setTitle(e.target.value);
+                queueCollabSync();
+              }}
+              className="bg-transparent hover:bg-white/10 focus:bg-white/20 px-2 py-0.5 rounded text-xs sm:text-sm font-medium text-white outline-none w-32 sm:w-56 transition"
               placeholder="Document Title..."
               title="Click to rename document"
             />
             <span className="text-[10px] text-white/70 ml-2 hidden md:inline">
-              {savedTime}
+              {collabSession ? (syncStatus === "saving" ? "Syncing..." : "Synced live") : savedTime}
             </span>
           </div>
         </div>
 
-        {/* Right Header Controls */}
-        <div className="flex items-center gap-2">
-          {onStartDuoPaste && (
+        {/* Right Header Controls (Word Collab Status, Switcher, Publish) */}
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          {collabSession ? (
+            /* Live Word Collab Status Bar */
+            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-purple-500/30 border border-purple-300/40 text-xs">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              <span className="font-bold text-[11px] tracking-tight hidden sm:inline">Collab Live</span>
+
+              {/* PIN button */}
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(collabSession.pin);
+                  setCopiedCollabPin(true);
+                  setTimeout(() => setCopiedCollabPin(false), 2000);
+                }}
+                className="px-1.5 py-0.5 rounded bg-black/25 hover:bg-black/40 font-mono text-[10px] font-extrabold flex items-center gap-1 cursor-pointer transition"
+                title="Click to copy 6-digit PIN"
+              >
+                <span>PIN:{collabSession.pin}</span>
+                {copiedCollabPin ? <Check className="w-2.5 h-2.5 text-emerald-400" /> : <Copy className="w-2.5 h-2.5 text-white/70" />}
+              </button>
+
+              {/* Role Badge */}
+              <span className="px-1.5 py-0.2 rounded bg-white/20 text-[9px] font-bold uppercase tracking-wider hidden md:inline">
+                {role === "host" ? "User A (Host)" : "User B (Guest)"}
+              </span>
+
+              {/* Collaborators Count */}
+              <span className="text-[10px] text-white/90 hidden lg:inline font-semibold">
+                {collaboratorsCount > 1 ? "👥 2 Online" : "👥 Waiting for B..."}
+              </span>
+
+              {/* Typing indicator */}
+              {lastRemoteUpdate && (
+                <span className="text-[10px] text-amber-300 font-bold animate-pulse hidden xl:inline">
+                  {lastRemoteUpdate}
+                </span>
+              )}
+
+              {/* Copy Invite Link */}
+              <button
+                type="button"
+                onClick={() => {
+                  const link = `${window.location.origin}/duo/${collabSession.pin}?mode=word`;
+                  navigator.clipboard.writeText(link);
+                  setCopiedCollabLink(true);
+                  setTimeout(() => setCopiedCollabLink(false), 2000);
+                }}
+                className="px-1.5 py-0.5 rounded bg-white/10 hover:bg-white/20 text-[10px] font-medium flex items-center gap-1 transition"
+                title="Copy invite link with PIN"
+              >
+                <Link className="w-2.5 h-2.5" />
+                <span className="hidden sm:inline">{copiedCollabLink ? "Copied!" : "Invite Link"}</span>
+              </button>
+
+              {/* Leave Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (confirm("Leave live Word Collab session?")) {
+                    setCollabSession(null);
+                    if (onLeaveCollab) onLeaveCollab();
+                  }
+                }}
+                className="p-1 hover:bg-red-500/40 rounded text-white/80 hover:text-white transition"
+                title="Leave Word Collab"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          ) : (
+            /* Start / Join Word Collab Button */
             <button
               type="button"
-              onClick={onStartDuoPaste}
-              className="px-2.5 py-1 rounded bg-purple-500/30 hover:bg-purple-500/50 text-white text-xs font-semibold flex items-center gap-1.5 border border-purple-300/40 transition"
-              title="Collaborate live with another person"
+              onClick={() => {
+                setShowCollabModal(true);
+                setCollabTab("start");
+              }}
+              className="px-2.5 py-1 rounded bg-purple-500/30 hover:bg-purple-500/50 text-white text-xs font-semibold flex items-center gap-1.5 border border-purple-300/40 transition cursor-pointer"
+              title="Word Collab: Real-time two-person live synchronized editor (User A & B)"
             >
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>DuoPaste</span>
+              <Users className="w-3.5 h-3.5 text-purple-200" />
+              <span>Word Collab</span>
             </button>
           )}
 
@@ -746,7 +1124,7 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
             <button
               type="button"
               onClick={onSwitchToStandard}
-              className="px-2.5 py-1 rounded bg-white/10 hover:bg-white/20 text-white text-xs font-medium flex items-center gap-1 transition"
+              className="px-2.5 py-1 rounded bg-white/10 hover:bg-white/20 text-white text-xs font-medium flex items-center gap-1 transition cursor-pointer"
               title="Switch to Standard Note Editor"
             >
               <FileText className="w-3.5 h-3.5" />
@@ -761,7 +1139,7 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
             className="px-3 py-1 rounded bg-white text-[#2b579a] hover:bg-blue-50 font-bold text-xs shadow transition flex items-center gap-1.5 cursor-pointer"
           >
             <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-            <span>Publish</span>
+            <span>{collabSession ? "Publish Shared Doc" : "Publish"}</span>
           </button>
         </div>
       </div>
@@ -796,19 +1174,30 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
         
         {/* --- FILE TAB --- */}
         {activeTab === "file" && (
-          <div className="flex items-center gap-2 py-1">
+          <div className="flex items-center gap-2 py-1 flex-wrap">
             <button
               type="button"
               onClick={handlePublish}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-xs"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-xs cursor-pointer"
             >
               <FileDown className="w-4 h-4" />
               <span>Publish to SharePaste</span>
             </button>
             <button
               type="button"
+              onClick={() => {
+                setShowCollabModal(true);
+                setCollabTab("start");
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-purple-600 hover:bg-purple-700 text-white font-semibold shadow-xs cursor-pointer"
+            >
+              <Users className="w-4 h-4" />
+              <span>Word Collab Live (A & B)</span>
+            </button>
+            <button
+              type="button"
               onClick={handleExportDocx}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 font-semibold border border-gray-300 dark:border-slate-700"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 font-semibold border border-gray-300 dark:border-slate-700 cursor-pointer"
             >
               <Download className="w-4 h-4 text-blue-600" />
               <span>Export Word (.doc / .docx)</span>
@@ -816,7 +1205,7 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
             <button
               type="button"
               onClick={handlePrint}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 font-semibold border border-gray-300 dark:border-slate-700"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 font-semibold border border-gray-300 dark:border-slate-700 cursor-pointer"
             >
               <Printer className="w-4 h-4" />
               <span>Print / Save as PDF</span>
@@ -824,16 +1213,17 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
             <button
               type="button"
               onClick={() => docxInputRef.current?.click()}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 font-semibold border border-gray-300 dark:border-slate-700"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 font-semibold border border-gray-300 dark:border-slate-700 cursor-pointer"
+              title="Open any Word .docx, .html, or text document"
             >
               <Upload className="w-4 h-4 text-emerald-600" />
-              <span>Open / Import Document</span>
+              <span>Open / Import Word Doc</span>
             </button>
             <input
               type="file"
               ref={docxInputRef}
               onChange={handleDocImport}
-              accept=".txt,.md,.html,.htm"
+              accept=".docx,.doc,.html,.htm,.txt,.md"
               className="hidden"
             />
           </div>
@@ -1720,14 +2110,14 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
             <button
               type="button"
               onClick={handleFind}
-              className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded"
+              className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded cursor-pointer"
             >
               Find
             </button>
             <button
               type="button"
               onClick={handleReplaceAll}
-              className="px-3 py-1 bg-gray-200 dark:bg-slate-700 hover:bg-gray-300 text-gray-800 dark:text-gray-200 font-semibold rounded"
+              className="px-3 py-1 bg-gray-200 dark:bg-slate-700 hover:bg-gray-300 text-gray-800 dark:text-gray-200 font-semibold rounded cursor-pointer"
             >
               Replace All
             </button>
@@ -1740,7 +2130,7 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
           <button
             type="button"
             onClick={() => setShowFindReplace(false)}
-            className="p-1 hover:bg-gray-200 dark:hover:bg-slate-800 rounded-full"
+            className="p-1 hover:bg-gray-200 dark:hover:bg-slate-800 rounded-full cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -1788,7 +2178,10 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
           <div
             ref={canvasRef}
             contentEditable
-            onInput={updateStats}
+            onInput={() => {
+              updateStats();
+              queueCollabSync();
+            }}
             data-placeholder="Start typing your Word document here..."
             className="paste-content outline-none min-h-[820px] empty:before:content-[attr(data-placeholder)] empty:before:text-gray-400 dark:empty:before:text-gray-600 relative z-10"
             style={{
@@ -1806,6 +2199,11 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
           <span>{wordCount} words</span>
           <span className="hidden sm:inline">{charCount} characters</span>
           <span className="hidden md:inline">English (United States)</span>
+          {collabSession && (
+            <span className="text-emerald-300 font-bold hidden lg:inline">
+              ● Word Collab Active
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-3">
@@ -1843,7 +2241,7 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
             <button
               type="button"
               onClick={() => setZoom(Math.max(50, zoom - 10))}
-              className="hover:bg-white/10 p-0.5 rounded"
+              className="hover:bg-white/10 p-0.5 rounded cursor-pointer"
             >
               -
             </button>
@@ -1859,7 +2257,7 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
             <button
               type="button"
               onClick={() => setZoom(Math.min(200, zoom + 10))}
-              className="hover:bg-white/10 p-0.5 rounded"
+              className="hover:bg-white/10 p-0.5 rounded cursor-pointer"
             >
               +
             </button>
@@ -1875,7 +2273,7 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
             <button
               type="button"
               onClick={() => setShowStatsModal(false)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1"
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
@@ -1916,11 +2314,184 @@ export const WordDocEditor: React.FC<WordDocEditorProps> = ({
               <button
                 type="button"
                 onClick={() => setShowStatsModal(false)}
-                className="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-xs"
+                className="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-xs cursor-pointer"
               >
                 Close
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Word Collab (Start / Join) Modal */}
+      {showCollabModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white dark:bg-[#121214] border border-purple-200 dark:border-purple-900/60 rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl relative">
+            <button
+              type="button"
+              onClick={() => setShowCollabModal(false)}
+              className="absolute top-5 right-5 p-2 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-800 transition cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Header */}
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-purple-500/25">
+                <Users className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                  <span>Word Collab</span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-800">
+                    Live
+                  </span>
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Two-person synchronized live Microsoft Word editor
+                </p>
+              </div>
+            </div>
+
+            {/* Tabs: Start vs Join */}
+            {!collabSession && (
+              <div className="flex p-1 mb-5 bg-gray-100 dark:bg-[#1c1c1f] rounded-xl text-xs font-semibold">
+                <button
+                  type="button"
+                  onClick={() => setCollabTab("start")}
+                  className={`flex-1 py-2 rounded-lg transition cursor-pointer ${
+                    collabTab === "start"
+                      ? "bg-white dark:bg-[#27272a] text-gray-900 dark:text-white shadow-xs"
+                      : "text-gray-500 hover:text-gray-900 dark:hover:text-white"
+                  }`}
+                >
+                  Start New (User A)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCollabTab("join")}
+                  className={`flex-1 py-2 rounded-lg transition cursor-pointer ${
+                    collabTab === "join"
+                      ? "bg-white dark:bg-[#27272a] text-gray-900 dark:text-white shadow-xs"
+                      : "text-gray-500 hover:text-gray-900 dark:hover:text-white"
+                  }`}
+                >
+                  Join with PIN (User B)
+                </button>
+              </div>
+            )}
+
+            {/* TAB 1: START / ACTIVE COLLAB SESSION */}
+            {(collabTab === "start" || collabSession) && (
+              <div className="space-y-4">
+                {collabSession ? (
+                  <>
+                    <div className="p-4 rounded-2xl bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800/60 text-center">
+                      <div className="text-[11px] font-bold text-purple-700 dark:text-purple-300 uppercase tracking-wider mb-1">
+                        Collaboration PIN
+                      </div>
+                      <div className="text-4xl font-black font-mono tracking-widest text-purple-900 dark:text-purple-200 py-1">
+                        {collabSession.pin}
+                      </div>
+                      <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                        Share this PIN with User B to edit this Word document together live.
+                      </p>
+                    </div>
+
+                    {collabQrUrl && (
+                      <div className="flex flex-col items-center justify-center p-3 rounded-2xl bg-gray-50 dark:bg-[#1c1c1f] border border-gray-200 dark:border-[#27272a]">
+                        <img src={collabQrUrl} alt="Collab QR code" className="w-36 h-36 rounded-lg shadow-xs" />
+                        <span className="text-[10px] text-gray-400 mt-2 font-medium">
+                          Scan with phone to join Word Collab instantly
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(collabSession.pin);
+                          setCopiedCollabPin(true);
+                          setTimeout(() => setCopiedCollabPin(false), 2000);
+                        }}
+                        className="flex-1 py-2.5 rounded-xl bg-gray-100 dark:bg-[#27272a] hover:bg-gray-200 dark:hover:bg-[#3f3f46] text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer"
+                      >
+                        {copiedCollabPin ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                        <span>{copiedCollabPin ? "PIN Copied!" : "Copy PIN"}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const link = `${window.location.origin}/duo/${collabSession.pin}?mode=word`;
+                          navigator.clipboard.writeText(link);
+                          setCopiedCollabLink(true);
+                          setTimeout(() => setCopiedCollabLink(false), 2000);
+                        }}
+                        className="flex-1 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-md shadow-purple-600/25 transition cursor-pointer"
+                      >
+                        {copiedCollabLink ? <Check className="w-3.5 h-3.5 text-emerald-300" /> : <Link className="w-3.5 h-3.5" />}
+                        <span>{copiedCollabLink ? "Link Copied!" : "Copy Invite Link"}</span>
+                      </button>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowCollabModal(false)}
+                      className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md transition cursor-pointer"
+                    >
+                      Enter Live Word Document
+                    </button>
+                  </>
+                ) : (
+                  <div className="text-center py-4">
+                    <p className="text-xs text-gray-600 dark:text-gray-400 mb-4">
+                      Create an instant 6-digit PIN to invite User B into this exact Word document.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleStartWordCollab}
+                      className="w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-md shadow-purple-600/25 transition cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      <Users className="w-4 h-4" />
+                      <span>Generate PIN & Start Word Collab</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB 2: JOIN WITH PIN */}
+            {collabTab === "join" && !collabSession && (
+              <form onSubmit={handleJoinWordCollab} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5 uppercase tracking-wider">
+                    Enter User A's 6-Digit PIN
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={8}
+                    value={collabJoinPin}
+                    onChange={(e) => setCollabJoinPin(e.target.value)}
+                    placeholder="e.g. 482910"
+                    className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 text-gray-900 dark:text-white text-lg font-mono tracking-widest text-center font-bold outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                  {joinCollabError && (
+                    <p className="text-xs text-red-500 font-semibold mt-1.5">{joinCollabError}</p>
+                  )}
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isJoiningCollab || !collabJoinPin.trim()}
+                  className="w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:opacity-60 text-white font-bold text-xs shadow-md shadow-purple-600/25 transition cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <Users className="w-4 h-4" />
+                  <span>{isJoiningCollab ? "Joining Word Collab..." : "Join Live Word Document"}</span>
+                </button>
+              </form>
+            )}
+
           </div>
         </div>
       )}

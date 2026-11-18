@@ -9,6 +9,7 @@ import uploadRouter from "../src/server/routes/upload.js";
 import aiRouter from "../src/server/routes/ai.js";
 import { highlightCodeTokens } from "../src/client/utils/syntaxHighlight.js";
 import duoRouter from "../src/server/routes/duo.js";
+import * as mammoth from "mammoth";
 
 const app = express();
 app.use(express.json());
@@ -431,8 +432,96 @@ print(f"Total: {metrics['total']} | Average: {metrics['mean']:.2f} | Status: {me
     assert.ok(getWordPaste.content.includes("Project Milestone"));
     console.log(`✓ Word document styling, tables, fonts, and highlights preserved on /p/${wordPasteData.slug}`);
 
+    // 16. Test Word Collab (User A & B Live Synchronization & Shared Publishing)
+    console.log("[Test 16] Testing Word Collab Live Collaboration & Shared Publishing...");
+    
+    // Verify mammoth docx parser is present
+    assert.strictEqual(typeof mammoth.convertToHtml, "function", "mammoth.convertToHtml must be a function");
+    console.log("✓ Mammoth docx parser loaded and verified");
+
+    // Step A: User A creates a Word Collab session
+    const wordCollabCreateRes = await fetch(`${baseUrl}/api/duo/create`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: "Collaborative Project Charter",
+        content: "<h1 style=\"color:#1f497d; font-family:'Calibri Light';\">Project Charter</h1><p>Authored initially by User A.</p>"
+      })
+    });
+    assert.strictEqual(wordCollabCreateRes.status, 201, "Collab session should be created with 201");
+    const wordCollabData = await wordCollabCreateRes.json() as any;
+    const pin = wordCollabData.pin;
+    const userAClientId = wordCollabData.clientId;
+    assert.ok(pin && pin.length === 6, "Valid 6-digit PIN generated");
+    assert.ok(userAClientId, "User A received client ID");
+    console.log(`✓ User A started Word Collab session with PIN ${pin}`);
+
+    // Step B: User B joins Word Collab session
+    const wordCollabJoinRes = await fetch(`${baseUrl}/api/duo/join`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pin })
+    });
+    assert.strictEqual(wordCollabJoinRes.status, 200, "User B joins successfully");
+    const joinData = await wordCollabJoinRes.json() as any;
+    const userBClientId = joinData.clientId;
+    assert.notStrictEqual(userBClientId, userAClientId, "User B gets unique client ID");
+    assert.strictEqual(joinData.session.guest_client_id, userBClientId, "User B registered as guest");
+    console.log(`✓ User B successfully joined Word Collab session with PIN ${pin}`);
+
+    // Step C: User A edits content with Word styling and syncs live
+    const userAWordUpdate = `<h1 style="color:#1f497d; font-family:'Calibri Light';">Project Charter</h1><p>Authored initially by User A.</p><div style="background-color:#eff6ff; border-left:4px solid #3b82f6; padding:8px 12px;"><p style="font-weight:bold; color:#1d4ed8;">Milestone 1 by User A</p></div>`;
+    const syncResA = await fetch(`${baseUrl}/api/duo/sync`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        pin,
+        clientId: userAClientId,
+        title: "Collaborative Project Charter (v2)",
+        content: userAWordUpdate
+      })
+    });
+    assert.strictEqual(syncResA.status, 200, "User A sync succeeded");
+
+    // Verify User B receives User A's update
+    const freshSessionB = await (await fetch(`${baseUrl}/api/duo/${pin}`)).json() as any;
+    assert.strictEqual(freshSessionB.session.title, "Collaborative Project Charter (v2)");
+    assert.strictEqual(freshSessionB.session.content, userAWordUpdate);
+    console.log("✓ User A's Word formatting synced live to session");
+
+    // Step D: User B contributes with Word highlighting and adds a section
+    const userBWordUpdate = userAWordUpdate + `<p style="background-color:#ffff00; font-family:Calibri;">Reviewed & approved by User B with Word Highlighter.</p>`;
+    const syncResB = await fetch(`${baseUrl}/api/duo/sync`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        pin,
+        clientId: userBClientId,
+        content: userBWordUpdate
+      })
+    });
+    assert.strictEqual(syncResB.status, 200, "User B sync succeeded");
+
+    // Step E: User B publishes the shared Word Document
+    const pubCollabRes = await fetch(`${baseUrl}/api/duo/publish`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pin, visibility: "public" })
+    });
+    assert.strictEqual(pubCollabRes.status, 201, "Publish shared Word doc succeeded");
+    const pubCollabData = await pubCollabRes.json() as any;
+    assert.ok(pubCollabData.slug, "Collaborative Word doc has public slug");
+
+    // Step F: Verify published document has combined content and styling from both users
+    const finalSharedPaste = await (await fetch(`${baseUrl}/api/pastes/${pubCollabData.slug}`)).json() as any;
+    assert.strictEqual(finalSharedPaste.title, "Collaborative Project Charter (v2)");
+    assert.ok(finalSharedPaste.content.includes("Milestone 1 by User A"));
+    assert.ok(finalSharedPaste.content.includes("Reviewed & approved by User B with Word Highlighter"));
+    assert.ok(finalSharedPaste.content.includes("background-color:#ffff00"));
+    console.log(`✓ Collaborative Word document published successfully at /p/${pubCollabData.slug} with both User A & User B edits!`);
+
     console.log("\n=======================================================");
-    console.log("🎉 ALL AUTOMATED TESTS PASSED SUCCESSFULLY! (15/15) 🎉");
+    console.log("🎉 ALL AUTOMATED TESTS PASSED SUCCESSFULLY! (16/16) 🎉");
     console.log("=======================================================\n");
 
 
